@@ -43,80 +43,157 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 
+/* FeelOS dark theme – base values */
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.141 0.005 285.823);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.141 0.005 285.823);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.141 0.005 285.823);
-  --primary: oklch(0.21 0.006 285.885);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.967 0.001 286.375);
-  --secondary-foreground: oklch(0.21 0.006 285.885);
-  --muted: oklch(0.967 0.001 286.375);
-  --muted-foreground: oklch(0.552 0.016 285.938);
-  --accent: oklch(0.967 0.001 286.375);
-  --accent-foreground: oklch(0.21 0.006 285.885);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.92 0.004 286.32);
-  --input: oklch(0.92 0.004 286.32);
-  --ring: oklch(0.705 0.015 286.067);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.141 0.005 285.823);
-  --sidebar-primary: oklch(0.21 0.006 285.885);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.967 0.001 286.375);
-  --sidebar-accent-foreground: oklch(0.21 0.006 285.885);
-  --sidebar-border: oklch(0.92 0.004 286.32);
-  --sidebar-ring: oklch(0.705 0.015 286.067);
+  --radius: 0.75rem;
+
+  /* Background + text */
+  --background: #020617; /* very dark blue/black */
+  --foreground: #f9fafb; /* almost white */
+
+  /* Cards / surfaces (glassy navy) */
+  --card: rgba(15, 23, 42, 0.94); /* slate-900-ish */
+  --card-foreground: #e5e7eb;
+
+  --popover: rgba(15, 23, 42, 0.98);
+  --popover-foreground: #f9fafb;
+
+  /* Primary accent (pink–orange FeelOS button color) */
+  --primary: #ff4b91;
+  --primary-foreground: #ffffff;
+
+  /* Secondary surface */
+  --secondary: rgba(15, 23, 42, 0.8);
+  --secondary-foreground: #e5e7eb;
+
+  /* Muted / subtle */
+  --muted: rgba(15, 23, 42, 0.7);
+  --muted-foreground: #94a3b8;
+
+  /* Accent pills / chips */
+  --accent: rgba(56, 189, 248, 0.12); /* cyan glow */
+  --accent-foreground: #e0f2fe;
+
+  /* Destructive */
+  --destructive: #f97373;
+
+  /* Borders / inputs / focus ring */
+  --border: rgba(148, 163, 184, 0.35);
+  --input: rgba(15, 23, 42, 0.9);
+  --ring: #38bdf8; /* cyan focus */
+
+  /* Chart colors (for future dashboards) */
+  --chart-1: #38bdf8; /* cyan */
+  --chart-2: #a855f7; /* purple */
+  --chart-3: #f97316; /* orange */
+  --chart-4: #22c55e; /* green */
+  --chart-5: #ec4899; /* pink */
+
+  /* Sidebar specifically (just slightly different to stand out if used) */
+  --sidebar: rgba(15, 23, 42, 0.96);
+  --sidebar-foreground: #f9fafb;
+  --sidebar-primary: #ff4b91;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: rgba(56, 189, 248, 0.12);
+  --sidebar-accent-foreground: #e0f2fe;
+  --sidebar-border: rgba(148, 163, 184, 0.3);
+  --sidebar-ring: #38bdf8;
 }
 
+/* If you ever add .dark class, keep it the same look */
 .dark {
-  --background: oklch(0.141 0.005 285.823);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.21 0.006 285.885);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.21 0.006 285.885);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.92 0.004 286.32);
-  --primary-foreground: oklch(0.21 0.006 285.885);
-  --secondary: oklch(0.274 0.006 286.033);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.274 0.006 286.033);
-  --muted-foreground: oklch(0.705 0.015 286.067);
-  --accent: oklch(0.274 0.006 286.033);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.552 0.016 285.938);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.21 0.006 285.885);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.274 0.006 286.033);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.552 0.016 285.938);
+  --background: #020617;
+  --foreground: #f9fafb;
+
+  --card: rgba(15, 23, 42, 0.94);
+  --card-foreground: #e5e7eb;
+
+  --popover: rgba(15, 23, 42, 0.98);
+  --popover-foreground: #f9fafb;
+
+  --primary: #ff4b91;
+  --primary-foreground: #ffffff;
+
+  --secondary: rgba(15, 23, 42, 0.8);
+  --secondary-foreground: #e5e7eb;
+
+  --muted: rgba(15, 23, 42, 0.7);
+  --muted-foreground: #94a3b8;
+
+  --accent: rgba(56, 189, 248, 0.12);
+  --accent-foreground: #e0f2fe;
+
+  --destructive: #f97373;
+
+  --border: rgba(148, 163, 184, 0.35);
+  --input: rgba(15, 23, 42, 0.9);
+  --ring: #38bdf8;
+
+  --chart-1: #38bdf8;
+  --chart-2: #a855f7;
+  --chart-3: #f97316;
+  --chart-4: #22c55e;
+  --chart-5: #ec4899;
+
+  --sidebar: rgba(15, 23, 42, 0.96);
+  --sidebar-foreground: #f9fafb;
+  --sidebar-primary: #ff4b91;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: rgba(56, 189, 248, 0.12);
+  --sidebar-accent-foreground: #e0f2fe;
+  --sidebar-border: rgba(148, 163, 184, 0.3);
+  --sidebar-ring: #38bdf8;
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
-    @apply bg-background text-foreground;
+    @apply text-foreground font-sans;
+    background-color: var(--background);
+    /* FeelOS-style radial + linear gradient background */
+    background-image:
+      radial-gradient(circle at top left, #1f2937 0, transparent 55%),
+      radial-gradient(circle at bottom right, #4c1d95 0, transparent 55%),
+      linear-gradient(to bottom right, #020617, #020617);
+    background-attachment: fixed;
   }
 }
+
+@layer components {
+  /* Glassy card used across dashboard */
+  .card {
+    @apply rounded-2xl bg-black/40 border border-white/6 backdrop-blur-lg p-6 shadow-xl;
+  }
+
+  /* KPI tile */
+  .kpi {
+    @apply flex flex-col items-start justify-center p-5 rounded-xl bg-gradient-to-br from-white/3 to-white/2 border border-white/6;
+  }
+
+  /* Chart placeholder (responsive) */
+  .chart-placeholder {
+    @apply w-full h-48 sm:h-56 md:h-64 rounded-xl bg-gradient-to-r from-slate-800 to-slate-900 flex items-center justify-center text-slate-400;
+  }
+
+  /* Responsive grid for dashboard cards */
+  .dashboard-grid {
+    @apply grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4;
+  }
+
+  /* Table responsive wrapper */
+  .table-responsive {
+    @apply overflow-x-auto rounded-xl bg-black/30 p-4;
+  }
+
+  /* Subtle FAANG-like accent */
+  .accent-strong {
+    background-image: linear-gradient(90deg, rgba(255,75,145,0.12), rgba(255,184,74,0.08));
+  }
+}
+
+/* small helpers */
+.text-muted { color: rgba(255,255,255,0.7); }
+.small { font-size: 0.85rem; }
