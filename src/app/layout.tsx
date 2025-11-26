@@ -33,7 +33,7 @@ export default function RootLayout({
       <body className={`${geistSans.variable} ${geistMono.variable} bg-[var(--background)] text-[var(--foreground)]`}>
         {/* persistent header showing logo on all pages (below loading overlay z-50) */}
         <header className="fixed top-4 left-1/2 transform -translate-x-1/2 z-40 w-full max-w-7xl px-4">
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center justify-between">
             <a href="/" aria-label="FeelOS home" className="flex items-center gap-3">
               <img src="/logo.jpeg" alt="FeelOS" width={40} height={40} className="rounded-md object-contain" />
               <span className="hidden sm:inline-block font-semibold">FeelOS</span>

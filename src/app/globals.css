@@ -166,6 +166,14 @@
   /* Glassy card used across dashboard */
   .card {
     @apply rounded-2xl bg-black/40 border border-white/6 backdrop-blur-lg p-6 shadow-xl;
+    /* increased min height for hero cards and consistent inner spacing */
+    min-height: 10rem;
+  }
+
+  /* Hero-specific card (large analytics area) */
+  .hero-card {
+    @apply rounded-2xl bg-black/40 border border-white/6 backdrop-blur-lg p-6 shadow-xl;
+    min-height: 18rem;
   }
 
   /* KPI tile */
@@ -175,7 +183,7 @@
 
   /* Chart placeholder (responsive) */
   .chart-placeholder {
-    @apply w-full h-48 sm:h-56 md:h-64 rounded-xl bg-gradient-to-r from-slate-800 to-slate-900 flex items-center justify-center text-slate-400;
+    @apply w-full h-40 sm:h-48 md:h-56 rounded-xl bg-gradient-to-r from-slate-800 to-slate-900 flex items-center justify-center text-slate-400;
   }
 
   /* Responsive grid for dashboard cards */
