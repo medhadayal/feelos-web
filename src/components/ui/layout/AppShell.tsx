@@ -10,15 +10,15 @@ type AppShellProps = {
 export default function AppShell({ children }: AppShellProps) {
   return (
     <div className="min-h-screen bg-background text-foreground flex">
-      {/* Sidebar – you can replace with your real Sidebar component later */}
+      {/* Sidebar */}
       <aside className="hidden md:flex w-64 flex-col border-r border-border bg-sidebar/90">
         <div className="p-4 border-b border-sidebar-border">
           <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-2xl bg-primary flex items-center justify-center">
-              <span className="text-xs font-semibold text-primary-foreground">
-                F
-              </span>
-            </div>
+            <img
+              src="/logo.jpeg"
+              alt="FeelOS"
+              className="h-8 w-8 rounded-2xl object-cover"
+            />
             <div>
               <p className="text-sm font-semibold tracking-tight">
                 FeelOS
@@ -53,8 +53,8 @@ export default function AppShell({ children }: AppShellProps) {
 
       {/* Main area */}
       <main className="flex-1 flex flex-col">
-        {/* Top bar */}
-        <header className="h-16 border-b border-border flex items-center justify-between px-4 md:px-6 bg-background/80 backdrop-blur-sm">
+        {/* Top bar (softer / semi-transparent) */}
+        <header className="h-16 border-b border-border/30 flex items-center justify-between px-4 md:px-6 bg-background/60 backdrop-blur-sm">
           <div>
             <h1 className="text-base md:text-lg font-semibold tracking-tight">
               FeelOS Dashboard
@@ -72,8 +72,8 @@ export default function AppShell({ children }: AppShellProps) {
           </div>
         </header>
 
-        {/* Page content */}
-        <div className="flex-1 p-4 md:p-6 overflow-y-auto">
+        {/* Page content: remove default padding so pages (login/dashboard) can be full-bleed */}
+        <div className="flex-1 overflow-y-auto">
           {children}
         </div>
       </main>
