@@ -29,6 +29,7 @@ export default function RootLayout({
     <html lang="en">
       <head>
         <link rel="icon" href="/favicon.jpeg" type="image/jpeg" />
+        <link rel="apple-touch-icon" href="/favicon.jpeg" />
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
         {/* persistent header showing logo on all pages */}

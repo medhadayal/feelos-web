@@ -165,14 +165,13 @@
 @layer components {
   /* Glassy card used across dashboard */
   .card {
-    @apply rounded-2xl bg-black/40 border border-white/6 backdrop-blur-lg p-6 shadow-xl;
-    /* increased min height for hero cards and consistent inner spacing */
+    @apply rounded-2xl bg-black/40 border border-white/6 backdrop-blur-lg p-6 shadow-xl transition-all duration-200 ease-in-out;
     min-height: 10rem;
   }
 
   /* Hero-specific card (large analytics area) */
   .hero-card {
-    @apply rounded-2xl bg-black/40 border border-white/6 backdrop-blur-lg p-6 shadow-xl;
+    @apply rounded-2xl bg-black/40 border border-white/6 backdrop-blur-lg p-6 shadow-xl transition-all duration-200 ease-in-out;
     min-height: 18rem;
   }
 
@@ -241,8 +240,26 @@
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
   }
-}
 
-/* small helpers */
-.text-muted { color: rgba(255,255,255,0.7); }
-.small { font-size: 0.85rem; }
+  /* Skeleton loader */
+  .skeleton {
+    @apply bg-gradient-to-r from-white/6 to-white/8 rounded-md animate-pulse;
+    min-height: 1rem;
+  }
+
+  /* Accessible focus ring helper */
+  .focus-ring {
+    box-shadow: 0 0 0 4px rgba(56,189,248,0.12);
+    outline: none;
+  }
+
+  /* Subtle entrance */
+  .enter-up {
+    transform: translateY(8px);
+    opacity: 0;
+    animation: enter-up 360ms cubic-bezier(.2,.9,.2,1) forwards;
+  }
+  @keyframes enter-up {
+    to { transform: translateY(0); opacity: 1; }
+  }
+}

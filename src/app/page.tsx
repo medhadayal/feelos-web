@@ -26,14 +26,14 @@ export default function LoginPage() {
 
 	return (
 		<main className="relative min-h-screen flex items-center justify-center bg-[linear-gradient(180deg,#020617,#071029)] text-foreground">
-			{/* decorative gradient shapes (no images) */}
-			<div className="pointer-events-none absolute inset-0 -z-10">
+			{/* gradient shapes only */}
+			<div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
 				<div className="absolute -left-32 -top-24 w-80 h-80 rounded-full bg-pink-600/20 blur-3xl" />
 				<div className="absolute right-[-6rem] top-24 w-96 h-96 rounded-full bg-indigo-600/16 blur-3xl" />
-				<div className="absolute left-1/2 bottom-[-10rem] w-[36rem] h-[36rem] rounded-full bg-sky-500/6 blur-2xl transform -translate-x-1/2" />
 			</div>
 
-			<div className="z-10 w-full max-w-md px-6">
+			{/* Centered login card */}
+			<div className="z-10 w-full max-w-md px-6 enter-up no-motion">
 				<div className="mx-auto backdrop-blur-lg bg-black/50 border border-white/8 rounded-3xl p-8 shadow-xl">
 					<div className="flex items-center gap-4 mb-4">
 						<img src="/logo.jpeg" alt="FeelOS Logo" width={56} height={56} className="rounded-md" />
@@ -47,20 +47,21 @@ export default function LoginPage() {
 						<div>
 							<label className="text-xs text-slate-300">Email</label>
 							<input
-								name="email"
 								type="email"
+								name="email"
+								required
 								placeholder="you@company.com"
-								className="mt-1 w-full rounded-xl bg-white/5 px-3 py-2 text-sm outline-none border border-white/10 focus:border-pink-400"
+								className="mt-1 w-full rounded-xl bg-white/5 px-3 py-2 text-sm outline-none border border-white/10 focus:border-pink-400 focus:ring-2 focus:ring-[var(--ring)]"
 							/>
 						</div>
 
 						<div>
 							<label className="text-xs text-slate-300">Password</label>
 							<input
-								name="password"
 								type="password"
-								placeholder="••••••••"
-								className="mt-1 w-full rounded-xl bg-white/5 px-3 py-2 text-sm outline-none border border-white/10 focus:border-pink-400"
+								name="password"
+								required
+								className="mt-1 w-full rounded-xl bg-white/5 px-3 py-2 text-sm outline-none border border-white/10 focus:border-pink-400 focus:ring-2 focus:ring-[var(--ring)]"
 							/>
 						</div>
 
@@ -72,11 +73,16 @@ export default function LoginPage() {
 							<button type="button" className="text-sm text-sky-300">Forgot?</button>
 						</div>
 
-						<Link href="/dashboard" className="block">
-							<button type="button" className="mt-4 w-full rounded-xl bg-gradient-to-r from-pink-500 via-orange-400 to-yellow-300 px-4 py-2.5 text-sm font-semibold text-slate-900 shadow">
-								Sign in
-							</button>
-						</Link>
+						<div className="mt-4">
+							<Link href="/dashboard" className="block mt-3">
+								<button
+									type="button"
+									className="w-full inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold transition-all duration-200 ease-in-out bg-gradient-to-r from-pink-500 via-orange-400 to-yellow-300 text-slate-900 shadow"
+								>
+									Log In →
+								</button>
+							</Link>
+						</div>
 
 						<p className="mt-3 text-center text-xs text-slate-400">Don’t have an account? <span className="text-sky-300">Sign up</span></p>
 					</form>
