@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { Document, Packer, Paragraph, TextRun } from "docx";
 
-export const runtime = "node";
+export const runtime = "nodejs";
 
 export async function POST(req: Request) {
   try {

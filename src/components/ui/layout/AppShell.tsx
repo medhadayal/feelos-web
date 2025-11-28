@@ -21,11 +21,45 @@ export default function AppShell({ children }: AppShellProps) {
       >
         <div className="p-4 border-b border-sidebar-border flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <img
-              src="/logo.jpeg"
-              alt="FeelOS"
-              className="h-8 w-8 rounded-2xl object-cover"
-            />
+            {/* sidebar avatar — replaced with inline cartoon SVG */}
+            <span className="block">
+              <svg
+                className="h-8 w-8 rounded-2xl object-cover"
+                viewBox="0 0 160 160"
+                role="img"
+                aria-label="FeelOS avatar"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <defs>
+                  <linearGradient id="feelosGrad" x1="0" x2="1" y1="0" y2="1">
+                    <stop offset="0%" stopColor="#FF6FA1" />
+                    <stop offset="60%" stopColor="#FFB86B" />
+                    <stop offset="100%" stopColor="#FFD76B" />
+                  </linearGradient>
+                  <filter id="softShadow" x="-50%" y="-50%" width="200%" height="200%">
+                    <feDropShadow dx="0" dy="6" stdDeviation="10" floodColor="#000" floodOpacity="0.35" />
+                  </filter>
+                </defs>
+
+                <g filter="url(#softShadow)">
+                  <circle cx="80" cy="80" r="74" fill="url(#feelosGrad)" />
+                </g>
+
+                {/* eyes */}
+                <g transform="translate(0, -6)">
+                  <ellipse cx="56" cy="72" rx="10" ry="12" fill="#fff" />
+                  <ellipse cx="104" cy="72" rx="10" ry="12" fill="#fff" />
+                  <circle cx="56" cy="74" r="4" fill="#0b1220" />
+                  <circle cx="104" cy="74" r="4" fill="#0b1220" />
+                </g>
+
+                {/* smile */}
+                <path d="M52 98 C70 118, 90 118, 108 98" stroke="#0b1220" strokeWidth="4" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                {/* small accent */}
+                <circle cx="52" cy="52" r="5" fill="rgba(255,255,255,0.28)" />
+              </svg>
+            </span>
+
             {!collapsed && (
               <div>
                 <p className="text-sm font-semibold tracking-tight">FeelOS</p>
@@ -182,11 +216,29 @@ export default function AppShell({ children }: AppShellProps) {
               className="hidden sm:inline-flex items-center gap-2 rounded-full px-3 py-1.5 bg-white/6"
               aria-label="Profile"
             >
-              <img
-                src="/logo.jpeg"
-                alt="Profile"
+              {/* header/profile avatar — replaced with inline cartoon SVG */}
+              <svg
                 className="h-6 w-6 rounded-full object-cover"
-              />
+                viewBox="0 0 160 160"
+                role="img"
+                aria-label="FeelOS profile avatar"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <defs>
+                  <linearGradient id="feelosGradSmall" x1="0" x2="1" y1="0" y2="1">
+                    <stop offset="0%" stopColor="#FF6FA1" />
+                    <stop offset="60%" stopColor="#FFB86B" />
+                    <stop offset="100%" stopColor="#FFD76B" />
+                  </linearGradient>
+                </defs>
+                <circle cx="80" cy="80" r="80" fill="url(#feelosGradSmall)" />
+                <ellipse cx="55" cy="65" rx="6" ry="7" fill="#fff" />
+                <ellipse cx="105" cy="65" rx="6" ry="7" fill="#fff" />
+                <circle cx="55" cy="66" r="2.5" fill="#0b1220" />
+                <circle cx="105" cy="66" r="2.5" fill="#0b1220" />
+                <path d="M56 92 C68 104, 92 104, 104 92" stroke="#0b1220" strokeWidth="2.5" fill="none" strokeLinecap="round" />
+              </svg>
+
               <span className="text-sm">You</span>
             </button>
 

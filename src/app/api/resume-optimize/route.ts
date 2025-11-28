@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-export const runtime = "node";
+export const runtime = "nodejs";
 
 type ReqBody = {
   resumeText: string;
