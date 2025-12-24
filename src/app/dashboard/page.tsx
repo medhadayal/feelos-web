@@ -1,6 +1,7 @@
 // app/dashboard/page.tsx
 'use client';
 
+import React from "react";
 import Link from "next/link";
 import AuthGuard from "../../components/AuthGuard";
 

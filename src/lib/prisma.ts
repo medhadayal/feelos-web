@@ -1,86 +1,117 @@
-// (Replaced static import with a runtime-safe initializer & mock fallback)
+// Runtime-safe Prisma initializer with in-memory fallback when @prisma/client is not installed.
 
-type MaybePromise<T> = T | Promise<T>;
+type AnyObj = Record<string, any>;
 
 function mockDelay<T>(v: T): Promise<T> {
-	return new Promise((res) => setTimeout(() => res(v), 50));
+	return new Promise((res) => setTimeout(() => res(v), 10));
 }
 
 function makeMockPrisma() {
-	// minimal mock implementations used by the app (best-effort)
-	const userStore: Record<string, any> = {};
+	// Minimal in-memory stores to keep the app usable without a DB
+	const users: Record<string, AnyObj> = {};
+	const jobs: AnyObj[] = [];
+	const messages: AnyObj[] = [];
+	const moods: AnyObj[] = [];
+	const now = () => new Date().toISOString();
+
+	function upsertUserByEmail(email?: string | null, name?: string | null) {
+		if (email) {
+			const existing = Object.values(users).find((u: AnyObj) => u.email === email) as AnyObj | undefined;
+			if (existing) return existing;
+		}
+		const id = `guest_${Math.random().toString(36).slice(2, 10)}`;
+		const u = { id, email: email ?? null, name: name ?? null, createdAt: now() };
+		users[id] = u;
+		return u;
+	}
 
 	return {
 		user: {
-			upsert: async ({ where, update, create }: any) => {
-				// try by email
-				const key = where?.email ?? `guest_${Math.random().toString(36).slice(2, 8)}`;
-				const existing = Object.values(userStore).find((u: any) => u.email === where?.email) as any;
-				if (existing) {
-					const updated = { ...existing, ...update };
-					userStore[existing.id] = updated;
-					return mockDelay(updated);
-				}
-				const id = `guest_${Math.random().toString(36).slice(2, 8)}`;
-				const created = { id, email: create?.email ?? null, name: create?.name ?? null, createdAt: new Date().toISOString() };
-				userStore[id] = created;
-				return mockDelay(created);
+			upsert: async ({ where, update, create }: AnyObj) => {
+				const email = where?.email ?? create?.email ?? null;
+				const name = (update?.name ?? create?.name) ?? null;
+				const u = upsertUserByEmail(email, name);
+				if (update && Object.keys(update).length) users[u.id] = { ...u, ...update };
+				return mockDelay(users[u.id]);
 			},
-			create: async ({ data }: any) => {
-				const id = `guest_${Math.random().toString(36).slice(2, 8)}`;
-				const created = { id, email: data?.email ?? null, name: data?.name ?? null, createdAt: new Date().toISOString() };
-				userStore[id] = created;
-				return mockDelay(created);
+			create: async ({ data }: AnyObj) => {
+				const u = upsertUserByEmail(data?.email ?? null, data?.name ?? null);
+				return mockDelay(u);
 			},
-			findUnique: async ({ where }: any) => {
+			findUnique: async ({ where }: AnyObj) => {
 				if (!where) return mockDelay(null);
-				const found = Object.values(userStore).find((u: any) => (where.id ? u.id === where.id : where.email && u.email === where.email)) || null;
-				return mockDelay(found);
+				if (where.id) return mockDelay(users[where.id] ?? null);
+				if (where.email) {
+					const u = Object.values(users).find((x: AnyObj) => x.email === where.email) ?? null;
+					return mockDelay(u);
+				}
+				return mockDelay(null);
 			},
 		},
 		conversationMessage: {
-			create: async ({ data }: any) => {
-				// return a simple record
-				const entry = { id: Math.random().toString(36).slice(2), ...data, createdAt: new Date().toISOString() };
+			create: async ({ data }: AnyObj) => {
+				const entry = { id: Math.random().toString(36).slice(2), ...data, createdAt: now() };
+				messages.push(entry);
 				return mockDelay(entry);
 			},
 		},
 		moodEntry: {
-			create: async ({ data }: any) => {
-				const entry = { id: Math.random().toString(36).slice(2), ...data, createdAt: new Date().toISOString() };
+			create: async ({ data }: AnyObj) => {
+				const entry = { id: Math.random().toString(36).slice(2), ...data, createdAt: now() };
+				moods.push(entry);
 				return mockDelay(entry);
 			},
 		},
-		// noop $disconnect for compatibility
+		jobApplication: {
+			create: async ({ data }: AnyObj) => {
+				const entry = { id: Math.random().toString(36).slice(2), ...data, status: data?.status ?? "Applied", createdAt: now(), updatedAt: now() };
+				jobs.push(entry);
+				return mockDelay(entry);
+			},
+			findMany: async ({ where, orderBy, take }: AnyObj) => {
+				let list = jobs.filter((j) => (where?.userId ? j.userId === where.userId : true));
+				if (orderBy?.updatedAt === "desc") list = list.sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));
+				if (typeof take === "number") list = list.slice(0, take);
+				return mockDelay(list);
+			},
+		},
 		$disconnect: async () => mockDelay(true),
 	};
 }
 
-// runtime-safe prisma initializer
+function safeRequirePrismaClient(): any | null {
+	try {
+		// prevent bundler resolution unless present
+		// eslint-disable-next-line no-eval
+		const req = eval('require') as any;
+		const mod = req?.('@prisma/client');
+		return mod?.PrismaClient ? mod.PrismaClient : null;
+	} catch {
+		return null;
+	}
+}
+
 declare global {
 	// eslint-disable-next-line no-var
 	var __prisma_client_instance: any | undefined;
 }
 
 let prisma: any;
+const hasDbUrl = !!process.env.DATABASE_URL;
 
-if (process.env.DATABASE_URL) {
-	try {
-		// eslint-disable-next-line @typescript-eslint/no-var-requires
-		const { PrismaClient } = require('@prisma/client');
-		// reuse global instance in dev to avoid multiple clients
-		global.__prisma_client_instance = global.__prisma_client_instance ?? new PrismaClient();
+if (hasDbUrl) {
+	const PrismaClientCtor = safeRequirePrismaClient();
+	if (PrismaClientCtor) {
+		global.__prisma_client_instance = global.__prisma_client_instance ?? new PrismaClientCtor({
+			log: process.env.NODE_ENV === "development" ? ["query", "warn", "error"] : ["error"],
+		});
 		prisma = global.__prisma_client_instance;
-	} catch (err) {
-		// If @prisma/client is not installed or cannot be loaded, fall back to mock
-		// Console a minimal warning for developer awareness
-		// (avoid throwing so the app can run)
-		// eslint-disable-next-line no-console
-		console.warn('[prisma] @prisma/client not available — using mock persistence. To enable real DB, install @prisma/client and set DATABASE_URL.');
+	} else {
+		console.warn("[prisma] @prisma/client not found — using in-memory mock. Install @prisma/client and run Prisma to enable DB.");
 		prisma = makeMockPrisma();
 	}
 } else {
-	// No DATABASE_URL configured — use mock persistence to keep app functional
+	console.warn("[prisma] DATABASE_URL not set — using in-memory mock.");
 	prisma = makeMockPrisma();
 }
 

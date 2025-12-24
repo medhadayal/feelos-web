@@ -34,27 +34,54 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "invalid request" }, { status: 400 });
     }
 
-    // If MODEL_INFERENCE_URL is set, proxy; otherwise local fallback
+    const openaiKey = process.env.OPENAI_API_KEY;
     const modelUrl = process.env.MODEL_INFERENCE_URL;
-    if (modelUrl) {
+
+    if (openaiKey) {
       try {
-        const r = await fetch(modelUrl, {
+        const r = await fetch("https://api.openai.com/v1/chat/completions", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ messages: body.messages }),
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${openaiKey}`,
+          },
+          body: JSON.stringify({
+            model: process.env.OPENAI_MODEL || "gpt-4o-mini",
+            messages: body.messages, // [{role, content}]
+            temperature: 0.3,
+            max_tokens: 800,
+          }),
         });
         if (!r.ok) {
-          const txt = await r.text().catch(() => "model error");
-          return NextResponse.json({ error: "model error", details: txt }, { status: 502 });
+          const txt = await r.text().catch(() => "openai error");
+          return NextResponse.json({ error: "openai error", details: txt }, { status: r.status });
         }
         const json = await r.json();
-        return NextResponse.json({ reply: json.reply ?? "", suggestedActions: json.suggestedActions ?? [] });
+        const reply = json?.choices?.[0]?.message?.content ?? "";
+        return NextResponse.json({ reply, suggestedActions: [] });
       } catch (err: any) {
         return NextResponse.json({ error: String(err?.message ?? err) }, { status: 502 });
       }
     }
 
-    // local fallback
+    if (modelUrl) {
+      try {
+        const r = await fetch(modelUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ messages: body.messages, options: body.options ?? {} }),
+        });
+        if (!r.ok) {
+          const txt = await r.text().catch(() => "model error");
+          return NextResponse.json({ error: "model inference failed", details: txt }, { status: 502 });
+        }
+        const json = await r.json();
+        return NextResponse.json({ reply: json.reply ?? "", suggestedActions: json.suggestedActions ?? [] });
+      } catch (err: any) {
+        return NextResponse.json({ error: "model proxy failed", details: String(err?.message ?? err) }, { status: 502 });
+      }
+    }
+
     const out = localInfer(body.messages);
     return NextResponse.json(out);
   } catch (err: any) {
