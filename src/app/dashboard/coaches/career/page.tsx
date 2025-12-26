@@ -14,13 +14,7 @@ export default function CareerCoachPage() {
   const [loadingJobs, setLoadingJobs] = useState(false);
 
   async function fetchUserId() {
-    try {
-      const res = await fetch("/api/auth/me", { credentials: "same-origin" });
-      const j = await res.json();
-      return j?.user?.id || null;
-    } catch {
-      return null;
-    }
+    try { const r = await fetch('/api/auth/me'); const j = await r.json(); return j?.user?.id || null; } catch { return null; }
   }
 
   useEffect(() => {
@@ -29,8 +23,8 @@ export default function CareerCoachPage() {
       setLoadingJobs(true);
       const uid = await fetchUserId();
       if (!uid) { setJobs([]); setLoadingJobs(false); return; }
-      const r = await fetch(`/api/tracker/list?userId=${encodeURIComponent(uid)}`);
-      const j = await r.json().catch(() => ({ jobs: [] }));
+      const res = await fetch(`/api/tracker/list?userId=${encodeURIComponent(uid)}`);
+      const j = await res.json().catch(() => ({ jobs: [] }));
       setJobs(j.jobs || []);
       setLoadingJobs(false);
     })();
@@ -39,14 +33,8 @@ export default function CareerCoachPage() {
   async function addSample() {
     const uid = await fetchUserId();
     if (!uid) return;
-    await fetch('/api/tracker/add', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: uid, company: "NewCo", role: "Software Engineer", status: "Applied", location: "Remote" }),
-    });
-    const r = await fetch(`/api/tracker/list?userId=${encodeURIComponent(uid)}`);
-    const j = await r.json().catch(() => ({ jobs: [] }));
-    setJobs(j.jobs || []);
+    await fetch('/api/tracker/add', { method: 'POST', headers: { 'Content-Type':'application/json' }, body: JSON.stringify({ userId: uid, company: 'NewCo', role: 'Software Engineer', status: 'Applied', location: 'Remote' }) });
+    const res = await fetch(`/api/tracker/list?userId=${encodeURIComponent(uid)}`); const j = await res.json(); setJobs(j.jobs || []);
   }
 
   return (
@@ -205,8 +193,7 @@ export default function CareerCoachPage() {
           {tab === 'interview' && (
             <div className="card p-6">
               <h3 className="font-semibold">Interview Prep</h3>
-              <p className="text-sm text-slate-300 mt-2">Practice common questions and get structured prompts. This section is a placeholder ready for wiring.</p>
-              <div className="mt-3 text-xs text-slate-400">Future: Q bank, timers, feedback, exporting notes.</div>
+              <p className="text-sm text-slate-300 mt-2">Practice Q&A, STAR prompts, feedback (coming soon).</p>
             </div>
           )}
 
@@ -251,8 +238,7 @@ export default function CareerCoachPage() {
           {tab === 'portfolio' && (
             <div className="card p-6">
               <h3 className="font-semibold">Portfolio Maker</h3>
-              <p className="text-sm text-slate-300 mt-2">Generate a simple portfolio from your resume/projects. This section is a placeholder ready for wiring.</p>
-              <div className="mt-3 text-xs text-slate-400">Future: themes, links, hosting/export options.</div>
+              <p className="text-sm text-slate-300 mt-2">Generate a simple portfolio from your resume/projects (coming soon).</p>
             </div>
           )}
         </div>

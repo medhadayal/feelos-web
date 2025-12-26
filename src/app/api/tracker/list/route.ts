@@ -1,7 +1,7 @@
 export const runtime = "nodejs";
 
 import { NextResponse } from "next/server";
-import { prisma } from "../../../../../src/lib/prisma";
+import { prisma } from "../../../../lib/prisma";
 
 export async function GET(req: Request) {
   try {

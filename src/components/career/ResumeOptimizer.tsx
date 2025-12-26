@@ -124,7 +124,24 @@ export default function ResumeOptimizer() {
     setSectionImprovements(improvements); setOptimizedResume(optimized);
   }
 
-  // Build a proper .docx from the optimized resume text (lazy import)
+  function wrapText(text: string, font: any, size: number, maxWidth: number) {
+    const words = text.split(/\s+/);
+    const lines: string[] = [];
+    let line = "";
+    for (const w of words) {
+      const cand = line ? line + " " + w : w;
+      if (font.widthOfTextAtSize(cand, size) <= maxWidth) line = cand;
+      else { if (line) lines.push(line); line = w; }
+    }
+    if (line) lines.push(line);
+    return lines;
+  }
+  function drawLines(page: any, lines: string[], font: any, size: number, x: number, yStart: number, lh: number, color: any) {
+    let y = yStart;
+    for (const ln of lines) { page.drawText(ln, { x, y, size, font, color }); y -= lh; }
+    return y;
+  }
+
   async function downloadDocx() {
     if (!optimizedResume) return;
     try {
@@ -132,117 +149,56 @@ export default function ResumeOptimizer() {
       const lines = optimizedResume.split(/\r?\n/);
       const paragraphs: any[] = [];
       const headerText = [targetRole.trim(), location.trim()].filter(Boolean).join(" — ");
-      if (headerText) {
-        paragraphs.push(new Paragraph({ text: headerText, heading: HeadingLevel.HEADING_2 }));
-        paragraphs.push(new Paragraph({ text: "" }));
-      }
-      for (const raw of lines) {
+      if (headerText) { paragraphs.push(new Paragraph({ text: headerText, heading: HeadingLevel.HEADING_2 })); paragraphs.push(new Paragraph({ text: "" })); }
+        for (const raw of lines) {
         const l = raw.trim();
         if (!l) { paragraphs.push(new Paragraph({ text: "" })); continue; }
-        if (l.startsWith("- ")) {
-          paragraphs.push(new Paragraph({
-            children: [new TextRun(l.replace(/^-\s*/, ""))],
-            bullet: { level: 0 },
-          }));
-        } else {
-          paragraphs.push(new Paragraph({ children: [new TextRun(l) ] }));
-        }
+          if (l.startsWith("- ")) paragraphs.push(new Paragraph({ children: [new TextRun(l.replace(/^-\s*/, ""))], bullet: { level: 0 } }));
+        else paragraphs.push(new Paragraph({ children: [new TextRun(l)] }));
       }
       const doc = new Document({ sections: [{ properties: {}, children: paragraphs }] });
       const blob = await Packer.toBlob(doc);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${(fileName || "resume").replace(/\.[^/.]+$/, '')}-optimized.docx`;
-      document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-    } catch {
-      setError("docx generator missing. Run: npm install docx");
-    }
+      const url = URL.createObjectURL(blob); const a = document.createElement("a");
+      a.href = url; a.download = `${(fileName || "resume").replace(/\.[^/.]+$/, '')}-optimized.docx`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    } catch { setError("docx generator missing. Run: npm install docx"); }
   }
 
-  // Build a clean PDF using pdf-lib (lazy import)
   async function downloadPdf() {
     if (!optimizedResume) return;
     try {
       const { PDFDocument, StandardFonts, rgb } = await import("pdf-lib");
       const pdfDoc = await PDFDocument.create();
-      let page = pdfDoc.addPage([612, 792]); // US Letter
+      let page = pdfDoc.addPage([612, 792]);
       const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
       const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-
-      const margin = 48;
-      let maxWidth = page.getWidth() - margin * 2;
-      let x = margin;
-      let y = page.getHeight() - margin;
+      const margin = 48; let maxWidth = page.getWidth() - margin * 2; let x = margin; let y = page.getHeight() - margin;
 
       const headerText = [targetRole.trim(), location.trim()].filter(Boolean).join(" — ");
-      if (headerText) {
-        const size = 16;
-        const wrappedHeader = wrapText(headerText, fontBold, size, maxWidth);
-        y = drawLines(page, wrappedHeader, fontBold, size, x, y, 20, rgb(1, 1, 1));
-        y -= 8;
-      }
+      if (headerText) { const size = 16; const hdrLines = wrapText(headerText, fontBold, size, maxWidth); y = drawLines(page, hdrLines, fontBold, size, x, y, 20, rgb(1,1,1)); y -= 8; }
 
       const lines = optimizedResume.split(/\r?\n/);
       for (const raw of lines) {
-        const l = raw.trim();
-        if (!l) { y -= 12; continue; }
-        const isBullet = l.startsWith("- ");
-        const txt = isBullet ? l.replace(/^-+\s*/, "") : l;
-        const size = 11;
-        const wrapped = wrapText(txt, font, size, maxWidth - (isBullet ? 12 : 0));
-        if (isBullet) {
-          page.drawCircle({ x: x + 3, y: y - 4, radius: 2, color: rgb(0.95, 0.95, 0.95) });
-          y = drawLines(page, wrapped, font, size, x + 12, y, 16, rgb(0.95, 0.95, 0.95));
-        } else {
-          y = drawLines(page, wrapped, font, size, x, y, 16, rgb(0.95, 0.95, 0.95));
-        }
+        const l = raw.trim(); if (!l) { y -= 12; continue; }
+        const isBullet = l.startsWith("- "); const txt = isBullet ? l.replace(/^-+\s*/, "") : l;
+        const size = 11; const wrapped = wrapText(txt, font, size, maxWidth - (isBullet ? 12 : 0));
+        if (isBullet) { page.drawCircle({ x: x + 3, y: y - 4, radius: 2, color: rgb(0.95,0.95,0.95) }); y = drawLines(page, wrapped, font, size, x + 12, y, 16, rgb(0.95,0.95,0.95)); }
+        else { y = drawLines(page, wrapped, font, size, x, y, 16, rgb(0.95,0.95,0.95)); }
         y -= 6;
-        if (y < margin + 50) {
-          page = pdfDoc.addPage([612, 792]);
-          x = margin;
-          y = page.getHeight() - margin;
-          maxWidth = page.getWidth() - margin * 2;
-        }
+        if (y < margin + 50) { page = pdfDoc.addPage([612, 792]); x = margin; y = page.getHeight() - margin; maxWidth = page.getWidth() - margin * 2; }
       }
 
       const pdfBytes = await pdfDoc.save();
       const blob = new Blob([pdfBytes], { type: "application/pdf" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${(fileName || "resume").replace(/\.[^/.]+$/, '')}-optimized.pdf`;
-      document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-    } catch {
-      setError("pdf generator missing. Run: npm install pdf-lib");
-    }
+      const url = URL.createObjectURL(blob); const a = document.createElement("a");
+      a.href = url; a.download = `${(fileName || "resume").replace(/\.[^/.]+$/, '')}-optimized.pdf`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    } catch { setError("pdf generator missing. Run: npm install pdf-lib"); }
   }
 
-  function wrapText(text: string, font: any, size: number, maxWidth: number) {
-    const words = text.split(/\s+/);
-    const lines: string[] = [];
-    let line = "";
-    for (const w of words) {
-      const candidate = line ? line + " " + w : w;
-      if (font.widthOfTextAtSize(candidate, size) <= maxWidth) {
-        line = candidate;
-      } else {
-        if (line) lines.push(line);
-        line = w;
-      }
-    }
-    if (line) lines.push(line);
-    return lines;
-  }
-
-  // Keep drawLines helper consistent
-  function drawLines(page: any, lines: string[], font: any, size: number, x: number, yStart: number, lineHeight: number, color: any) {
-    let y = yStart;
-    for (const ln of lines) {
-      page.drawText(ln, { x, y, size, font, color });
-      y -= lineHeight;
-    }
-    return y;
+  function downloadTxt() {
+    if (!optimizedResume) return;
+    const blob = new Blob([optimizedResume], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob); const a = document.createElement("a");
+    a.href = url; a.download = `${(fileName || "resume").replace(/\.[^/.]+$/, '')}-optimized.txt`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
   }
 
   return (
@@ -297,11 +253,17 @@ export default function ResumeOptimizer() {
         </div>
       )}
       <div className="flex space-x-2">
-        <button onClick={downloadDocx} className="bg-green-600 text-white rounded-md px-4 py-2 flex-1">
-          Download DOCX
+        <button onClick={() => navigator.clipboard?.writeText(optimizedResume ?? '')} className="text-sm bg-white/6 px-3 py-1 rounded">
+          Copy
         </button>
-        <button onClick={downloadPdf} className="bg-red-600 text-white rounded-md px-4 py-2 flex-1">
-          Download PDF
+        <button onClick={downloadDocx} className="text-sm bg-white/6 px-3 py-1 rounded">
+          Download .docx
+        </button>
+        <button onClick={downloadPdf} className="text-sm bg-white/6 px-3 py-1 rounded">
+          Download .pdf
+        </button>
+        <button onClick={downloadTxt} className="text-sm bg-white/6 px-3 py-1 rounded">
+          Download .txt
         </button>
       </div>
     </div>

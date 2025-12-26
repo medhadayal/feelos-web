@@ -11,20 +11,15 @@ function localInfer(messages: ChatMessage[]) {
     return { reply: "Hello — tell me what's on your mind and I'll help you break it down.", suggestedActions: ["Log mood", "Plan day"] };
   }
   if (lower.includes("resume") || lower.includes("cv")) {
-    return { reply: "I can help with your resume: paste a bullet and I'll suggest improvements (quantify impact, add keywords).", suggestedActions: ["Optimize bullet", "Add metrics"] };
+    return { reply: "Paste a key bullet and I'll suggest improvements (quantify, add role keywords).", suggestedActions: ["Optimize bullet"] };
   }
-  if (lower.includes("interview") || lower.includes("practice")) {
-    return { reply: "Let's run a quick mock interview — tell me the role and I'll ask a question.", suggestedActions: ["Start mock interview"] };
+  if (lower.includes("interview")) {
+    return { reply: "Let's do a short mock interview: tell me the role and I'll ask a question.", suggestedActions: ["Start mock interview"] };
   }
   if (lower.includes("anxious") || lower.includes("anxiety")) {
-    return { reply: "You sound anxious. Try a 2‑minute grounding: breathe 4s in, hold 4s, out 6s. Want me to guide?", suggestedActions: ["Guide breathing"] };
+    return { reply: "Try a 2‑minute grounding: breathe 4s in, hold 4s, exhale 6s. Want me to guide?", suggestedActions: ["Guide breathing"] };
   }
-  const reply =
-    `Thanks — here's a short plan:\n\n` +
-    `1) Break tasks into 15-minute blocks.\n` +
-    `2) Take a 2-minute breathing break.\n` +
-    `3) Choose one next action and start it.\n\nWhich would you like to try?`;
-  return { reply, suggestedActions: ["Break into blocks", "Do breathing", "Start step"] };
+  return { reply: "Plan: 1) 15‑minute task blocks 2) 2‑minute breathing 3) Define one next step. Which first?" };
 }
 
 export async function POST(req: Request) {
@@ -41,16 +36,8 @@ export async function POST(req: Request) {
       try {
         const r = await fetch("https://api.openai.com/v1/chat/completions", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${openaiKey}`,
-          },
-          body: JSON.stringify({
-            model: process.env.OPENAI_MODEL || "gpt-4o-mini",
-            messages: body.messages, // [{role, content}]
-            temperature: 0.3,
-            max_tokens: 800,
-          }),
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${openaiKey}` },
+          body: JSON.stringify({ model: process.env.OPENAI_MODEL || "gpt-4o-mini", messages: body.messages, temperature: 0.3, max_tokens: 800 }),
         });
         if (!r.ok) {
           const txt = await r.text().catch(() => "openai error");
@@ -82,8 +69,7 @@ export async function POST(req: Request) {
       }
     }
 
-    const out = localInfer(body.messages);
-    return NextResponse.json(out);
+    return NextResponse.json(localInfer(body.messages));
   } catch (err: any) {
     return NextResponse.json({ error: String(err?.message ?? err) }, { status: 500 });
   }
