@@ -52,6 +52,13 @@ Optional (only if you want DB-backed auth/user records):
 
 - `DATABASE_URL=...`
 
+Note: Prisma is configured for PostgreSQL. For Vercel, use a hosted Postgres (Neon/Supabase/etc). SQLite is not recommended for production/serverless.
+
+If you use Supabase + Vercel:
+
+- Set `DATABASE_URL` to the Supabase **connection pooler** URL (recommended for serverless runtime).
+- Set `DIRECT_URL` to the Supabase **direct** Postgres URL (used by Prisma migrations).
+
 ### 2) Verify readiness
 
 Run the app and confirm the health endpoint:
