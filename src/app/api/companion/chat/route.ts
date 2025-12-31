@@ -2,9 +2,15 @@ export const runtime = "nodejs";
 
 import { NextResponse } from "next/server";
 import { prisma } from "../../../../lib/prisma";
+import { getOrCreateSessionUserId } from "../../../../lib/session";
 
 type ChatMessage = { role: "user" | "assistant" | "system"; content: string };
-type ChatRequest = { userId: string; messages: ChatMessage[]; moodSnapshot?: { mood?: string } };
+type ChatRequest = { userId?: string; messages: ChatMessage[]; moodSnapshot?: { mood?: string } };
+
+function errToString(err: unknown) {
+  if (err instanceof Error) return err.message;
+  return String(err);
+}
 
 function localAssistantReply(userText: string, mood = "neutral") {
   const lower = (userText || "").toLowerCase();
@@ -27,18 +33,20 @@ async function persistMessage(userId: string, role: string, content: string) {
 export async function POST(req: Request) {
   try {
     const body: ChatRequest = await req.json();
-    if (!body?.userId || !Array.isArray(body.messages)) {
+    if (!Array.isArray(body?.messages)) {
       return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }
 
+    const { userId, setCookie } = getOrCreateSessionUserId(req);
+
     // persist user messages (best-effort)
     for (const m of body.messages.filter((x) => x.role === "user")) {
-      await persistMessage(body.userId, m.role, m.content);
+      await persistMessage(userId, m.role, m.content);
     }
 
     // call internal inference (uses OpenAI if key set, else local)
-    const base = process.env.BASE_URL ?? `http://localhost:${process.env.PORT ?? 3000}`;
-    const res = await fetch(new URL("/api/ai/infer", base).toString(), {
+    const inferUrl = new URL("/api/ai/infer", req.url);
+    const res = await fetch(inferUrl.toString(), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ messages: body.messages, options: { mood: body.moodSnapshot?.mood } }),
@@ -48,17 +56,21 @@ export async function POST(req: Request) {
       // fallback local deterministic reply
       const lastUser = [...body.messages].reverse().find((m) => m.role === "user")?.content ?? "";
       const reply = localAssistantReply(lastUser, body.moodSnapshot?.mood ?? "neutral");
-      await persistMessage(body.userId, "assistant", reply);
-      return NextResponse.json({ reply, suggestedActions: [] });
+      await persistMessage(userId, "assistant", reply);
+      const out = NextResponse.json({ reply, suggestedActions: [] });
+      if (setCookie) out.headers.set("Set-Cookie", setCookie);
+      return out;
     }
 
     const json = await res.json();
     const reply: string = json.reply ?? "";
     const suggestedActions: string[] = json.suggestedActions ?? [];
 
-    await persistMessage(body.userId, "assistant", reply);
-    return NextResponse.json({ reply, suggestedActions });
-  } catch (err: any) {
-    return NextResponse.json({ error: String(err?.message ?? err) }, { status: 500 });
+    await persistMessage(userId, "assistant", reply);
+    const out = NextResponse.json({ reply, suggestedActions });
+    if (setCookie) out.headers.set("Set-Cookie", setCookie);
+    return out;
+  } catch (err: unknown) {
+    return NextResponse.json({ error: errToString(err) }, { status: 500 });
   }
 }

@@ -22,7 +22,7 @@ export default function CoachCard({
     <div className="flex flex-col justify-between rounded-2xl bg-white/5 border border-white/10 p-4 shadow-sm backdrop-blur">
       <div className="flex items-center gap-3">
         <div
-          className={`flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br ${iconBg}`}
+          className={`flex h-10 w-10 items-center justify-center rounded-2xl bg-linear-to-br ${iconBg}`}
         >
           <span className="text-lg">💼</span>
         </div>

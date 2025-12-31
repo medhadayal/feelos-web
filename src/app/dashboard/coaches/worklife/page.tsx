@@ -17,7 +17,7 @@ export default function WorklifeCoachPage() {
 
             <div className="mt-6 flex flex-wrap gap-3">
               <Link href="/dashboard/coaches/worklife/session" className="inline-block">
-                <button className="inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold bg-gradient-to-r from-green-400 to-teal-300 text-slate-900 shadow">
+                <button className="inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold bg-linear-to-r from-green-400 to-teal-300 text-slate-900 shadow">
                   Try a balance plan
                 </button>
               </Link>

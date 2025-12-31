@@ -9,12 +9,12 @@ const mockUser = { id: "user_1", name: "You" };
 
 export default function CompanionPage() {
   const [messages, setMessages] = useState<Message[]>([
-    { id: "m1", role: "assistant", content: "Hi — I'm your FeelOS Companion. How can I help today?", timestamp: new Date().toISOString() },
+    { id: "m1", role: "assistant", content: "Hi — I\u2019m your FeelOS Companion. How can I help today?", timestamp: new Date().toISOString() },
   ]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [mood, setMood] = useState<string>("neutral");
-  const [todayFocus, setTodayFocus] = useState<string[]>(["Plan morning routine", "Deep work: product spec", "1:1 with manager"]);
+  const todayFocus: string[] = ["Plan morning routine", "Deep work: product spec", "1:1 with manager"];
   const [selfCare, setSelfCare] = useState<string>("Take a 10‑minute mindful walk");
   const messagesRef = useRef<HTMLDivElement | null>(null);
 
@@ -88,7 +88,7 @@ export default function CompanionPage() {
         }
       }
       setTimeout(streamStep, 120);
-    } catch (err) {
+    } catch {
       addMessage("assistant", "Network error — please try again.");
       setSending(false);
     }
@@ -114,7 +114,7 @@ export default function CompanionPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#020617] to-[#071029] text-white">
+    <div className="min-h-screen bg-linear-to-b from-[#020617] to-[#071029] text-white">
       <div className="max-w-7xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left sidebar */}
         <aside className="lg:col-span-2 bg-black/20 p-4 rounded-lg">
@@ -136,7 +136,7 @@ export default function CompanionPage() {
             <div ref={messagesRef} className="flex-1 overflow-auto p-3 space-y-3" style={{ scrollbarGutter: "stable" }}>
               {messages.map((m) => (
                 <div key={m.id} className={`max-w-[85%] ${m.role === "user" ? "ml-auto text-right" : "mr-auto text-left"}`}>
-                  <div className={`inline-block px-4 py-2 rounded-lg ${m.role === "user" ? "bg-gradient-to-r from-pink-500 to-yellow-300 text-slate-900" : "bg-white/5"}`}>
+                  <div className={`inline-block px-4 py-2 rounded-lg ${m.role === "user" ? "bg-linear-to-r from-pink-500 to-yellow-300 text-slate-900" : "bg-white/5"}`}>
                     <div className="text-sm whitespace-pre-wrap">{m.content}</div>
                     <div className="text-xs text-slate-400 mt-1">{new Date(m.timestamp).toLocaleTimeString()}</div>
                   </div>
@@ -163,8 +163,8 @@ export default function CompanionPage() {
 
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-slate-400 mr-2">Mood: <strong className="ml-1">{mood}</strong></span>
-                  <button onClick={() => logMood("happy", "Quick check")} className="px-4 py-2 rounded bg-gradient-to-r from-green-400 to-teal-400 text-slate-900 text-sm">Log Happy</button>
-                  <button onClick={() => sendMessage()} disabled={sending} className="px-4 py-2 rounded bg-gradient-to-r from-pink-500 to-yellow-300 text-slate-900 text-sm">
+                  <button onClick={() => logMood("happy", "Quick check")} className="px-4 py-2 rounded bg-linear-to-r from-green-400 to-teal-400 text-slate-900 text-sm">Log Happy</button>
+                  <button onClick={() => sendMessage()} disabled={sending} className="px-4 py-2 rounded bg-linear-to-r from-pink-500 to-yellow-300 text-slate-900 text-sm">
                     {sending ? "Sending…" : "Send"}
                   </button>
                 </div>
@@ -191,7 +191,7 @@ export default function CompanionPage() {
             </div>
 
             <div className="p-3 bg-white/5 rounded">
-              <div className="text-xs text-slate-300">Today's focus</div>
+              <div className="text-xs text-slate-300">Today\u2019s focus</div>
               <ol className="list-decimal ml-5 mt-2 text-sm">
                 {todayFocus.map((f, i) => <li key={i} className="mt-1">{f}</li>)}
               </ol>

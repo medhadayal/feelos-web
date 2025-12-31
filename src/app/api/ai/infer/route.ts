@@ -1,8 +1,15 @@
 export const runtime = "nodejs";
 
 import { NextResponse } from "next/server";
+import { rateLimit } from "../../../../lib/rateLimit";
+import { getOrCreateSessionUserId } from "../../../../lib/session";
 
 type ChatMessage = { role: "user" | "assistant" | "system"; content: string };
+
+function errToString(err: unknown) {
+  if (err instanceof Error) return err.message;
+  return String(err);
+}
 
 function localInfer(messages: ChatMessage[]) {
   const lastUser = [...messages].reverse().find((m) => m.role === "user")?.content ?? "";
@@ -22,11 +29,62 @@ function localInfer(messages: ChatMessage[]) {
   return { reply: "Plan: 1) 15‑minute task blocks 2) 2‑minute breathing 3) Define one next step. Which first?" };
 }
 
+function isValidRole(v: unknown): v is ChatMessage["role"] {
+  return v === "user" || v === "assistant" || v === "system";
+}
+
+function normalizeMessages(v: unknown): ChatMessage[] | null {
+  if (!Array.isArray(v)) return null;
+  const out: ChatMessage[] = [];
+  for (const item of v) {
+    if (typeof item !== "object" || item === null) return null;
+    const rec = item as Record<string, unknown>;
+    const role = rec.role;
+    const content = rec.content;
+    if (!isValidRole(role)) return null;
+    if (typeof content !== "string") return null;
+    const c = content.trim();
+    if (!c) continue;
+    out.push({ role, content: c });
+  }
+  return out.length ? out.slice(-50) : [];
+}
+
+async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs = 25_000) {
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+function cap(s: string, max = 2000) {
+  if (s.length <= max) return s;
+  return s.slice(0, max) + "…";
+}
+
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
-    if (!body || !Array.isArray(body.messages)) {
+    const rl = rateLimit(req, { key: "api:ai-infer", limit: 20, windowMs: 60_000 });
+    if (!rl.ok) {
+      return NextResponse.json(
+        { error: "rate_limited" },
+        { status: 429, headers: { "Retry-After": String(Math.ceil((rl.resetMs - Date.now()) / 1000)) } }
+      );
+    }
+
+    const { setCookie } = getOrCreateSessionUserId(req);
+
+    const body = await req.json().catch(() => null);
+    if (!body || typeof body !== "object") {
       return NextResponse.json({ error: "invalid request" }, { status: 400 });
+    }
+
+    const messages = normalizeMessages((body as { messages?: unknown }).messages);
+    if (!messages) {
+      return NextResponse.json({ error: "invalid messages" }, { status: 400 });
     }
 
     const openaiKey = process.env.OPENAI_API_KEY;
@@ -34,43 +92,57 @@ export async function POST(req: Request) {
 
     if (openaiKey) {
       try {
-        const r = await fetch("https://api.openai.com/v1/chat/completions", {
+        const r = await fetchWithTimeout("https://api.openai.com/v1/chat/completions", {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${openaiKey}` },
-          body: JSON.stringify({ model: process.env.OPENAI_MODEL || "gpt-4o-mini", messages: body.messages, temperature: 0.3, max_tokens: 800 }),
+          body: JSON.stringify({
+            model: process.env.OPENAI_MODEL || "gpt-4o-mini",
+            messages,
+            temperature: 0.3,
+            max_tokens: 800,
+          }),
         });
         if (!r.ok) {
           const txt = await r.text().catch(() => "openai error");
-          return NextResponse.json({ error: "openai error", details: txt }, { status: r.status });
+          return NextResponse.json(
+            { error: "openai error", details: cap(txt), upstreamStatus: r.status },
+            { status: 502 }
+          );
         }
         const json = await r.json();
         const reply = json?.choices?.[0]?.message?.content ?? "";
-        return NextResponse.json({ reply, suggestedActions: [] });
-      } catch (err: any) {
-        return NextResponse.json({ error: String(err?.message ?? err) }, { status: 502 });
+        const out = NextResponse.json({ reply, suggestedActions: [] });
+        if (setCookie) out.headers.set("Set-Cookie", setCookie);
+        return out;
+      } catch (err: unknown) {
+        return NextResponse.json({ error: "openai request failed", details: errToString(err) }, { status: 502 });
       }
     }
 
     if (modelUrl) {
       try {
-        const r = await fetch(modelUrl, {
+        const r = await fetchWithTimeout(modelUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ messages: body.messages, options: body.options ?? {} }),
+          body: JSON.stringify({ messages, options: (body as { options?: unknown }).options ?? {} }),
         });
         if (!r.ok) {
           const txt = await r.text().catch(() => "model error");
-          return NextResponse.json({ error: "model inference failed", details: txt }, { status: 502 });
+          return NextResponse.json({ error: "model inference failed", details: cap(txt) }, { status: 502 });
         }
         const json = await r.json();
-        return NextResponse.json({ reply: json.reply ?? "", suggestedActions: json.suggestedActions ?? [] });
-      } catch (err: any) {
-        return NextResponse.json({ error: "model proxy failed", details: String(err?.message ?? err) }, { status: 502 });
+        const out = NextResponse.json({ reply: json.reply ?? "", suggestedActions: json.suggestedActions ?? [] });
+        if (setCookie) out.headers.set("Set-Cookie", setCookie);
+        return out;
+      } catch (err: unknown) {
+        return NextResponse.json({ error: "model proxy failed", details: errToString(err) }, { status: 502 });
       }
     }
 
-    return NextResponse.json(localInfer(body.messages));
-  } catch (err: any) {
-    return NextResponse.json({ error: String(err?.message ?? err) }, { status: 500 });
+    const out = NextResponse.json(localInfer(messages));
+    if (setCookie) out.headers.set("Set-Cookie", setCookie);
+    return out;
+  } catch (err: unknown) {
+    return NextResponse.json({ error: errToString(err) }, { status: 500 });
   }
 }

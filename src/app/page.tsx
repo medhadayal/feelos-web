@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+	import Image from 'next/image';
 import Link from 'next/link';
 
 export default function LoginPage() {
@@ -15,7 +16,7 @@ export default function LoginPage() {
 		return (
 			<div className="loading-screen">
 				<div className="loading-inner">
-					<img src="/logo.jpeg" alt="FeelOS" className="loading-logo" />
+					<Image src="/logo.jpeg" alt="FeelOS" width={96} height={96} className="loading-logo" priority />
 					<div className="loading-title">FeelOS</div>
 					<div className="loading-subtext">Loading…</div>
 					<div className="loading-spinner" />
@@ -36,7 +37,7 @@ export default function LoginPage() {
 			<div className="z-10 w-full max-w-md px-6 enter-up no-motion">
 				<div className="mx-auto backdrop-blur-lg bg-black/50 border border-white/8 rounded-3xl p-8 shadow-xl">
 					<div className="flex items-center gap-4 mb-4">
-						<img src="/logo.jpeg" alt="FeelOS Logo" width={56} height={56} className="rounded-md" />
+						<Image src="/logo.jpeg" alt="FeelOS Logo" width={56} height={56} className="rounded-md" priority />
 						<div>
 							<h2 className="text-2xl font-semibold text-white">Welcome to FeelOS</h2>
 							<p className="text-sm text-slate-300">Where Technology Feels Human</p>
@@ -77,7 +78,7 @@ export default function LoginPage() {
 							<Link href="/dashboard" className="block mt-3">
 								<button
 									type="button"
-									className="w-full inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold transition-all duration-200 ease-in-out bg-gradient-to-r from-pink-500 via-orange-400 to-yellow-300 text-slate-900 shadow"
+									className="w-full inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold transition-all duration-200 ease-in-out bg-linear-to-r from-pink-500 via-orange-400 to-yellow-300 text-slate-900 shadow"
 								>
 									Log In →
 								</button>

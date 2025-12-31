@@ -19,9 +19,17 @@ export default function DashboardPage() {
 			<main className="min-h-screen bg-[linear-gradient(180deg,#020617,#071029)] text-foreground">
 				<div className="max-w-7xl mx-auto px-6 py-8">
 					{/* header */}
-					<div className="mb-6">
-						<h1 className="text-3xl font-semibold">AI Coaches</h1>
-						<p className="text-sm text-slate-300 mt-1">Choose a companion to get personalized support</p>
+					<div className="mb-6 flex items-start justify-between gap-4">
+						<div>
+							<h1 className="text-3xl font-semibold">AI Coaches</h1>
+							<p className="text-sm text-slate-300 mt-1">Choose a companion to get personalized support</p>
+						</div>
+						<div className="flex items-center gap-2">
+							<span className="text-xs px-2 py-1 rounded-full bg-white/6 text-slate-300 border border-white/10">Guest mode</span>
+							<Link href="/login" className="text-xs px-3 py-2 rounded-md bg-white/6 hover:bg-white/10 border border-white/10">
+								Sign in
+							</Link>
+						</div>
 					</div>
 
 					{/* Responsive grid: mobile 1, sm 2, lg 2x2 (cards stretch to fill) */}
@@ -40,7 +48,7 @@ export default function DashboardPage() {
 								>
 									<div className="flex items-start justify-between">
 										<div className="flex items-center gap-4">
-											<div className={`w-14 h-14 rounded-lg bg-gradient-to-br ${c.accent} flex items-center justify-center font-bold text-slate-900 text-lg`} aria-hidden>
+											<div className={`w-14 h-14 rounded-lg bg-linear-to-br ${c.accent} flex items-center justify-center font-bold text-slate-900 text-lg`} aria-hidden>
 												{c.title.split(' ').map(w => w[0]).slice(0,2).join('')}
 											</div>
 											<div>

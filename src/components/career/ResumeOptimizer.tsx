@@ -2,270 +2,273 @@
 
 import React, { useState } from 'react';
 
-function extractKeywords(text: string, limit = 40) {
-  if (!text) return [];
-  const stop = new Set(["the","and","for","with","a","an","to","of","in","on","by","is","are","as","that","this","will","be","or","from","at","we","you","your","our"]);
-  const tokens = text.toLowerCase().replace(/https?:\/\/\S+/g,'').replace(/[^a-z0-9\s]/g,' ').split(/\s+/).filter(Boolean).filter(t=>t.length>3 && !stop.has(t));
-  const freq: Record<string, number> = {};
-  for (const t of tokens) freq[t] = (freq[t]||0)+1;
-  return Object.entries(freq).sort((a,b)=>b[1]-a[1]).slice(0, limit).map(([k])=>k);
-}
-function sectionSplit(resume: string) {
-  const headings = ['experience','work experience','professional experience','education','skills','summary','projects','certifications'];
-  const lines = resume.split(/\r?\n/);
-  const sections: Record<string,string[]> = { Other: [] };
-  let current = 'Other';
-  for (const raw of lines) {
-    const l = raw.trim(); const low = l.toLowerCase();
-    const head = headings.find(h => low === h || low.startsWith(h+':') || low.startsWith(h+' -') || low === h.toUpperCase());
-    if (head) { current = head[0].toUpperCase()+head.slice(1); sections[current] = sections[current]||[]; continue; }
-    sections[current] = sections[current]||[]; sections[current].push(raw);
-  }
-  return sections;
-}
-function generateSectionImprovements(sections: Record<string,string[]>, jdKeywords: string[], roleKeywords: string[]) {
-  const out: Record<string,string[]> = {};
-  for (const [sec, lines] of Object.entries(sections)) {
-    const text = lines.join(' ').toLowerCase(); const suggestions: string[] = [];
-    if (sec.toLowerCase().includes('experience')) {
-      if (!/\d/.test(text)) suggestions.push('Add numeric metrics to bullets (e.g., increased X by Y%).');
-      suggestions.push('Lead bullets with action verbs; quantify outcomes.');
-      const missing = jdKeywords.slice(0,6).filter(k => !text.includes(k));
-      if (missing.length) suggestions.push(`Consider adding keywords: ${missing.join(', ')}`);
-    } else if (sec.toLowerCase().includes('skills')) {
-      suggestions.push('List core technical skills/tools clearly (comma-separated).');
-    } else if (sec.toLowerCase().includes('summary')) {
-      suggestions.push('Make the summary role-focused; highlight top achievements.');
-    } else {
-      suggestions.push('Ensure consistent formatting and dates.');
-    }
-    out[sec] = suggestions;
-  }
-  return out;
-}
-function generateOptimizedResume(resume: string, jdKeywords: string[], roleKeywords: string[]) {
-  const lines = resume.split(/\r?\n/); const out: string[] = [];
-  for (const raw of lines) {
-    const l = raw.trim(); if (!l) { out.push(''); continue; }
-    if (/^[-•*]\s+/.test(l) || /^\d+\.\s+/.test(l) || (l.length < 80 && l.endsWith(':'))) {
-      let bullet = l.replace(/^[-•*\d\.\)\s]+/,'').trim();
-      bullet = bullet[0]?.toUpperCase() + bullet.slice(1);
-      if (!/\d/.test(bullet)) bullet += ' [add metric]';
-      for (const k of [...jdKeywords,...roleKeywords]) { const re = new RegExp(`\\b${k}\\b`,'ig'); bullet = bullet.replace(re, m => m.toUpperCase()); }
-      out.push('- ' + bullet);
-    } else {
-      let paragraph = l;
-      for (const k of [...jdKeywords,...roleKeywords]) { const re = new RegExp(`\\b${k}\\b`,'ig'); paragraph = paragraph.replace(re, m => m.toUpperCase()); }
-      out.push(paragraph);
-    }
-  }
-  return out.join('\n');
-}
+type OptimizeResponse = {
+  result?: {
+    ats_score: number | null;
+    jd_match_score: number | null;
+    section_improvements: Record<string, string[]>;
+    optimized_resume: string;
+  };
+  error?: string;
+  details?: string;
+};
 
 export default function ResumeOptimizer() {
   const [fileName, setFileName] = useState<string | null>(null);
   const [resumeText, setResumeText] = useState('');
   const [jobDesc, setJobDesc] = useState('');
   const [targetRole, setTargetRole] = useState('');
-  const [location, setLocation] = useState('');
-  const [atsScore, setAtsScore] = useState<number | null>(null);
-  const [jdMatchScore, setJdMatchScore] = useState<number | null>(null);
-  const [sectionImprovements, setSectionImprovements] = useState<Record<string,string[]>>({});
-  const [optimizedResume, setOptimizedResume] = useState<string | null>(null);
   const [parsingMsg, setParsingMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loadingFile, setLoadingFile] = useState(false);
+  const [optimizing, setOptimizing] = useState(false);
+  const [result, setResult] = useState<OptimizeResponse['result'] | null>(null);
+  const [downloading, setDownloading] = useState<null | 'docx' | 'pdf'>(null);
 
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     setError(null);
-    const f = e.target.files?.[0]; if (!f) return;
+    setResult(null);
+    const f = e.target.files?.[0];
+    if (!f) return;
+
+    if (f.size > 5 * 1024 * 1024) {
+      setError('File size exceeds 5MB. Please upload a smaller file.');
+      return;
+    }
+
+    if (!['text/plain', 'application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'].includes(f.type)) {
+      setError('Unsupported file format. Please upload a .txt, .pdf, or .docx file.');
+      return;
+    }
+
     setFileName(f.name);
     try {
+      setLoadingFile(true);
       if (f.type === 'text/plain' || f.name.toLowerCase().endsWith('.txt')) {
         const txt = await f.text();
-        setResumeText(txt); setParsingMsg('Loaded text file.');
+        setResumeText(txt);
+        setParsingMsg('Loaded text file.');
       } else {
-        setParsingMsg('For PDF/DOCX best-effort parsing is available.');
-        const fd = new FormData(); fd.append('file', f, f.name);
+        setParsingMsg('Parsing file...');
+        const fd = new FormData();
+        fd.append('file', f, f.name);
         const res = await fetch('/api/parse-resume', { method: 'POST', body: fd });
-        const json = await res.json();
-        if (res.ok && json.text) { setResumeText(json.text); setParsingMsg('Parsed file. Review the text.'); }
-        else { setParsingMsg('Could not parse — please paste resume text.'); }
+        const json = await res.json().catch(() => ({}));
+        if (res.ok && json.text) {
+          setResumeText(json.text);
+          setParsingMsg('Parsed file. Review the text.');
+        } else {
+          setParsingMsg('Could not parse — please paste resume text.');
+        }
       }
     } catch {
       setParsingMsg('Failed to read file — please paste resume text.');
+    } finally {
+      setLoadingFile(false);
     }
   }
 
-  function resetAll() {
-    setFileName(null); setResumeText(''); setJobDesc(''); setTargetRole(''); setLocation('');
-    setAtsScore(null); setJdMatchScore(null); setSectionImprovements({}); setOptimizedResume(null);
-    setParsingMsg(null); setError(null);
-  }
-
-  function optimize() {
+  async function optimize() {
     setError(null);
-    if (!resumeText.trim()) { setError('Paste your resume text or upload a file.'); return; }
-    if (!targetRole.trim()) { setError('Enter a target role/title.'); return; }
-    if (!jobDesc.trim()) { setError('Paste a job description.'); return; }
+    setResult(null);
 
-    const jdKeywords = extractKeywords(jobDesc + ' ' + targetRole, 40);
-    const roleKeywords = extractKeywords(targetRole, 20);
-    const resumeLower = resumeText.toLowerCase();
-    const matchedJD = jdKeywords.filter(k => resumeLower.includes(k));
-    const matchedRole = roleKeywords.filter(k => resumeLower.includes(k));
-    const ats = jdKeywords.length ? Math.round((matchedJD.length / jdKeywords.length) * 100) : 0;
-    const jdMatch = roleKeywords.length ? Math.round((matchedRole.length / roleKeywords.length) * 100) : 0;
-
-    const sections = sectionSplit(resumeText);
-    const improvements = generateSectionImprovements(sections, jdKeywords, roleKeywords);
-    const optimized = generateOptimizedResume(resumeText, jdKeywords, roleKeywords);
-
-    setAtsScore(ats); setJdMatchScore(jdMatch);
-    setSectionImprovements(improvements); setOptimizedResume(optimized);
-  }
-
-  function wrapText(text: string, font: any, size: number, maxWidth: number) {
-    const words = text.split(/\s+/);
-    const lines: string[] = [];
-    let line = "";
-    for (const w of words) {
-      const cand = line ? line + " " + w : w;
-      if (font.widthOfTextAtSize(cand, size) <= maxWidth) line = cand;
-      else { if (line) lines.push(line); line = w; }
+    const resume = resumeText.trim();
+    const jd = jobDesc.trim();
+    const role = targetRole.trim();
+    if (!resume || !jd || !role) {
+      setError('Please provide resume text, job description, and target role.');
+      return;
     }
-    if (line) lines.push(line);
-    return lines;
-  }
-  function drawLines(page: any, lines: string[], font: any, size: number, x: number, yStart: number, lh: number, color: any) {
-    let y = yStart;
-    for (const ln of lines) { page.drawText(ln, { x, y, size, font, color }); y -= lh; }
-    return y;
-  }
 
-  async function downloadDocx() {
-    if (!optimizedResume) return;
     try {
-      const { Document, Packer, Paragraph, TextRun, HeadingLevel } = await import("docx");
-      const lines = optimizedResume.split(/\r?\n/);
-      const paragraphs: any[] = [];
-      const headerText = [targetRole.trim(), location.trim()].filter(Boolean).join(" — ");
-      if (headerText) { paragraphs.push(new Paragraph({ text: headerText, heading: HeadingLevel.HEADING_2 })); paragraphs.push(new Paragraph({ text: "" })); }
-        for (const raw of lines) {
-        const l = raw.trim();
-        if (!l) { paragraphs.push(new Paragraph({ text: "" })); continue; }
-          if (l.startsWith("- ")) paragraphs.push(new Paragraph({ children: [new TextRun(l.replace(/^-\s*/, ""))], bullet: { level: 0 } }));
-        else paragraphs.push(new Paragraph({ children: [new TextRun(l)] }));
-      }
-      const doc = new Document({ sections: [{ properties: {}, children: paragraphs }] });
-      const blob = await Packer.toBlob(doc);
-      const url = URL.createObjectURL(blob); const a = document.createElement("a");
-      a.href = url; a.download = `${(fileName || "resume").replace(/\.[^/.]+$/, '')}-optimized.docx`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-    } catch { setError("docx generator missing. Run: npm install docx"); }
-  }
+      setOptimizing(true);
+      const res = await fetch('/api/resume-optimize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resumeText: resume, jobDesc: jd, targetRole: role }),
+      });
 
-  async function downloadPdf() {
-    if (!optimizedResume) return;
-    try {
-      const { PDFDocument, StandardFonts, rgb } = await import("pdf-lib");
-      const pdfDoc = await PDFDocument.create();
-      let page = pdfDoc.addPage([612, 792]);
-      const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-      const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-      const margin = 48; let maxWidth = page.getWidth() - margin * 2; let x = margin; let y = page.getHeight() - margin;
-
-      const headerText = [targetRole.trim(), location.trim()].filter(Boolean).join(" — ");
-      if (headerText) { const size = 16; const hdrLines = wrapText(headerText, fontBold, size, maxWidth); y = drawLines(page, hdrLines, fontBold, size, x, y, 20, rgb(1,1,1)); y -= 8; }
-
-      const lines = optimizedResume.split(/\r?\n/);
-      for (const raw of lines) {
-        const l = raw.trim(); if (!l) { y -= 12; continue; }
-        const isBullet = l.startsWith("- "); const txt = isBullet ? l.replace(/^-+\s*/, "") : l;
-        const size = 11; const wrapped = wrapText(txt, font, size, maxWidth - (isBullet ? 12 : 0));
-        if (isBullet) { page.drawCircle({ x: x + 3, y: y - 4, radius: 2, color: rgb(0.95,0.95,0.95) }); y = drawLines(page, wrapped, font, size, x + 12, y, 16, rgb(0.95,0.95,0.95)); }
-        else { y = drawLines(page, wrapped, font, size, x, y, 16, rgb(0.95,0.95,0.95)); }
-        y -= 6;
-        if (y < margin + 50) { page = pdfDoc.addPage([612, 792]); x = margin; y = page.getHeight() - margin; maxWidth = page.getWidth() - margin * 2; }
+      const json = (await res.json().catch(() => ({}))) as OptimizeResponse;
+      if (!res.ok) {
+        setError(json?.error || 'Failed to optimize resume.');
+        return;
       }
 
-      const pdfBytes = await pdfDoc.save();
-      const blob = new Blob([pdfBytes], { type: "application/pdf" });
-      const url = URL.createObjectURL(blob); const a = document.createElement("a");
-      a.href = url; a.download = `${(fileName || "resume").replace(/\.[^/.]+$/, '')}-optimized.pdf`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-    } catch { setError("pdf generator missing. Run: npm install pdf-lib"); }
+      setResult(json.result ?? null);
+    } catch {
+      setError('Failed to optimize resume.');
+    } finally {
+      setOptimizing(false);
+    }
   }
 
-  function downloadTxt() {
-    if (!optimizedResume) return;
-    const blob = new Blob([optimizedResume], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob); const a = document.createElement("a");
-    a.href = url; a.download = `${(fileName || "resume").replace(/\.[^/.]+$/, '')}-optimized.txt`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  async function download(kind: 'docx' | 'pdf') {
+    if (!result?.optimized_resume) return;
+    setError(null);
+
+    try {
+      setDownloading(kind);
+      const endpoint = kind === 'docx' ? '/api/generate-docx' : '/api/generate-pdf';
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: result.optimized_resume,
+          filename: `resume-optimized-${targetRole || 'target'}`,
+        }),
+      });
+
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        setError(j?.error || `Failed to generate ${kind.toUpperCase()}.`);
+        return;
+      }
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `resume-optimized-${(targetRole || 'target').replace(/[^a-z0-9\-_\.]/gi, '_')}.${kind}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      setError(`Failed to download ${kind.toUpperCase()}.`);
+    } finally {
+      setDownloading(null);
+    }
   }
 
   return (
-    <div className="p-4 max-w-3xl mx-auto">
-      <h1 className="text-2xl font-bold mb-4">AI Resume Optimizer</h1>
-      <div className="mb-4">
-        <label className="block text-sm font-medium mb-1">Resume File:</label>
-        <input type="file" accept=".txt,.pdf,.docx" onChange={handleFile} className="border rounded-md p-2 w-full" />
-        {parsingMsg && <p className="text-xs text-gray-500 mt-1">{parsingMsg}</p>}
+    <div className="space-y-5">
+      <div>
+        <h2 className="text-xl font-semibold">Resume Optimizer</h2>
+        <p className="text-sm text-slate-300 mt-1">Upload or paste your resume, add a job description, and generate an ATS-friendly version.</p>
       </div>
-      <div className="mb-4">
-        <label className="block text-sm font-medium mb-1">Paste Job Description:</label>
-        <textarea value={jobDesc} onChange={e => setJobDesc(e.target.value)} className="border rounded-md p-2 w-full h-24" />
+
+      <div className="space-y-2">
+        <label className="block text-sm font-medium">Resume File</label>
+        <input
+          type="file"
+          accept=".txt,.pdf,.docx"
+          onChange={handleFile}
+          className="w-full rounded-md bg-white/5 border border-white/10 px-3 py-2 text-sm"
+        />
+        {fileName && <p className="text-xs text-slate-400">Selected: {fileName}</p>}
+        {parsingMsg && <p className="text-xs text-slate-400">{parsingMsg}</p>}
+        {loadingFile && <p className="text-xs text-slate-400">Parsing…</p>}
       </div>
-      <div className="mb-4">
-        <label className="block text-sm font-medium mb-1">Target Role/Title:</label>
-        <input type="text" value={targetRole} onChange={e => setTargetRole(e.target.value)} className="border rounded-md p-2 w-full" />
+
+      <div className="space-y-2">
+        <label className="block text-sm font-medium">Resume Text</label>
+        <textarea
+          value={resumeText}
+          onChange={(e) => setResumeText(e.target.value)}
+          className="w-full rounded-md bg-white/5 border border-white/10 px-3 py-2 text-sm min-h-40"
+          placeholder="Paste your resume text here (or upload a file above)."
+        />
       </div>
-      <div className="mb-4">
-        <label className="block text-sm font-medium mb-1">Location:</label>
-        <input type="text" value={location} onChange={e => setLocation(e.target.value)} className="border rounded-md p-2 w-full" />
+
+      <div className="space-y-2">
+        <label className="block text-sm font-medium">Job Description</label>
+        <textarea
+          value={jobDesc}
+          onChange={(e) => setJobDesc(e.target.value)}
+          className="w-full rounded-md bg-white/5 border border-white/10 px-3 py-2 text-sm min-h-28"
+          placeholder="Paste the job description here."
+        />
       </div>
-      <div className="mb-4">
-        <button onClick={optimize} className="bg-blue-600 text-white rounded-md px-4 py-2 mr-2">
-          Optimize Resume
-        </button>
-        <button onClick={resetAll} className="bg-gray-300 rounded-md px-4 py-2">
-          Reset All
-        </button>
+
+      <div className="space-y-2">
+        <label className="block text-sm font-medium">Target Role/Title</label>
+        <input
+          type="text"
+          value={targetRole}
+          onChange={(e) => setTargetRole(e.target.value)}
+          className="w-full rounded-md bg-white/5 border border-white/10 px-3 py-2 text-sm"
+          placeholder="e.g., Software Engineer"
+        />
       </div>
-      {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
-      {atsScore !== null && jdMatchScore !== null && (
-        <div className="bg-gray-100 rounded-md p-4 mb-4">
-          <p className="text-sm text-gray-500 mb-2">ATS Score: <span className="font-semibold">{atsScore}%</span></p>
-          <p className="text-sm text-gray-500 mb-2">JD Match Score: <span className="font-semibold">{jdMatchScore}%</span></p>
+
+      {error && (
+        <div className="rounded-xl bg-white/5 border border-white/10 p-3 text-sm text-amber-200">
+          {error}
         </div>
       )}
-      {Object.keys(sectionImprovements).length > 0 && (
-        <div className="bg-gray-100 rounded-md p-4 mb-4">
-          <p className="text-sm text-gray-500 mb-2">Section Improvements:</p>
-          <ul className="list-disc list-inside text-sm text-gray-700">
-            {Object.entries(sectionImprovements).map(([sec, suggestions]) => (
-              <li key={sec} className="mb-1"><span className="font-semibold">{sec}:</span> {suggestions.join(' ')}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-      {optimizedResume && (
-        <div className="bg-gray-100 rounded-md p-4 mb-4">
-          <p className="text-sm text-gray-500 mb-2">Optimized Resume:</p>
-          <pre className="whitespace-pre-wrap text-sm text-gray-700">{optimizedResume}</pre>
-        </div>
-      )}
-      <div className="flex space-x-2">
-        <button onClick={() => navigator.clipboard?.writeText(optimizedResume ?? '')} className="text-sm bg-white/6 px-3 py-1 rounded">
-          Copy
+
+      <div className="flex items-center gap-3">
+        <button
+          onClick={optimize}
+          disabled={optimizing}
+          className={`px-4 py-2 rounded-md bg-white/6 text-sm font-medium ${optimizing ? 'opacity-70 cursor-not-allowed' : 'hover:bg-white/10'}`}
+        >
+          {optimizing ? 'Optimizing…' : 'Optimize Resume'}
         </button>
-        <button onClick={downloadDocx} className="text-sm bg-white/6 px-3 py-1 rounded">
-          Download .docx
-        </button>
-        <button onClick={downloadPdf} className="text-sm bg-white/6 px-3 py-1 rounded">
-          Download .pdf
-        </button>
-        <button onClick={downloadTxt} className="text-sm bg-white/6 px-3 py-1 rounded">
-          Download .txt
-        </button>
+        <span className="text-xs text-slate-400">Uses your configured AI model server-side.</span>
       </div>
+
+      {result && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="rounded-xl bg-white/5 border border-white/10 p-4">
+              <div className="text-xs text-slate-400">ATS Score</div>
+              <div className="text-2xl font-semibold">{result.ats_score ?? '—'}</div>
+            </div>
+            <div className="rounded-xl bg-white/5 border border-white/10 p-4">
+              <div className="text-xs text-slate-400">JD Match</div>
+              <div className="text-2xl font-semibold">{result.jd_match_score ?? '—'}</div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              onClick={() => download('docx')}
+              disabled={downloading !== null}
+              className={`px-4 py-2 rounded-md bg-white/6 text-sm font-medium ${downloading ? 'opacity-70 cursor-not-allowed' : 'hover:bg-white/10'}`}
+            >
+              {downloading === 'docx' ? 'Preparing Word…' : 'Download Word (.docx)'}
+            </button>
+            <button
+              onClick={() => download('pdf')}
+              disabled={downloading !== null}
+              className={`px-4 py-2 rounded-md bg-white/6 text-sm font-medium ${downloading ? 'opacity-70 cursor-not-allowed' : 'hover:bg-white/10'}`}
+            >
+              {downloading === 'pdf' ? 'Preparing PDF…' : 'Download PDF'}
+            </button>
+            <span className="text-xs text-slate-400">Downloads are generated from the optimized text below.</span>
+          </div>
+
+          <div className="rounded-xl bg-white/5 border border-white/10 p-4">
+            <h3 className="font-semibold">Section Improvements</h3>
+            <div className="mt-3 space-y-3">
+              {Object.keys(result.section_improvements || {}).length === 0 ? (
+                <p className="text-sm text-slate-300">No section suggestions returned.</p>
+              ) : (
+                Object.entries(result.section_improvements).map(([section, items]) => (
+                  <div key={section}>
+                    <div className="text-sm font-medium">{section}</div>
+                    <ul className="mt-2 space-y-1 text-sm text-slate-300">
+                      {(items || []).map((it, idx) => (
+                        <li key={idx}>• {it}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-xl bg-white/5 border border-white/10 p-4">
+            <h3 className="font-semibold">Optimized Resume</h3>
+            <textarea
+              readOnly
+              value={result.optimized_resume || ''}
+              className="mt-3 w-full rounded-md bg-black/30 border border-white/10 px-3 py-2 text-sm min-h-56"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -182,7 +182,7 @@
 
   /* Chart placeholder (responsive) */
   .chart-placeholder {
-    @apply w-full h-40 sm:h-48 md:h-56 rounded-xl bg-gradient-to-r from-slate-800 to-slate-900 flex items-center justify-center text-slate-400;
+    @apply w-full h-40 sm:h-48 md:h-56 rounded-xl bg-linear-to-r from-slate-800 to-slate-900 flex items-center justify-center text-slate-400;
   }
 
   /* Responsive grid for dashboard cards */
@@ -243,7 +243,7 @@
 
   /* Skeleton loader */
   .skeleton {
-    @apply bg-gradient-to-r from-white/6 to-white/8 rounded-md animate-pulse;
+    @apply bg-linear-to-r from-white/6 to-white/8 rounded-md animate-pulse;
     min-height: 1rem;
   }
 

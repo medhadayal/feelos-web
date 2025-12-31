@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import Image from "next/image";
+import Link from "next/link";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -35,14 +37,14 @@ export default function RootLayout({
         {/* persistent header showing logo on all pages */}
         <header className="fixed top-4 left-1/2 transform -translate-x-1/2 z-40 w-full max-w-7xl px-4">
           <div className="flex items-center justify-between">
-            <a href="/" aria-label="FeelOS home" className="flex items-center gap-3">
-              <img src="/logo.jpeg" alt="FeelOS" width={40} height={40} className="rounded-md object-contain" />
+            <Link href="/" aria-label="FeelOS home" className="flex items-center gap-3">
+              <Image src="/logo.jpeg" alt="FeelOS" width={40} height={40} className="rounded-md object-contain" priority />
               <span className="hidden sm:inline-block font-semibold">FeelOS</span>
-            </a>
+            </Link>
 
             {/* simple nav/actions placeholder */}
             <nav className="hidden md:flex items-center gap-3">
-              <a href="/dashboard" className="text-sm px-3 py-2 rounded-md hover:bg-white/3">Dashboard</a>
+              <Link href="/dashboard" className="text-sm px-3 py-2 rounded-md hover:bg-white/3">Dashboard</Link>
               <a href="#" className="text-sm px-3 py-2 rounded-md hover:bg-white/3">Coaches</a>
             </nav>
           </div>

@@ -14,10 +14,10 @@ export default function AppShell({ children }: AppShellProps) {
     <div className="min-h-screen bg-background text-foreground flex">
       {/* Sidebar */}
       <aside
+        id="app-shell-sidebar"
         className={`${
           collapsed ? "w-20" : "w-64"
         } hidden md:flex flex-col border-r border-border bg-sidebar/90 transition-all duration-200 ease-in-out`}
-        aria-expanded={!collapsed}
       >
         <div className="p-4 border-b border-sidebar-border flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -71,6 +71,8 @@ export default function AppShell({ children }: AppShellProps) {
           </div>
           <button
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-controls="app-shell-sidebar"
+            aria-expanded={!collapsed}
             aria-pressed={collapsed}
             onClick={() => setCollapsed((s) => !s)}
             className="p-2 rounded hover:bg-white/6 focus-ring transition-all duration-150"
@@ -242,7 +244,7 @@ export default function AppShell({ children }: AppShellProps) {
               <span className="text-sm">You</span>
             </button>
 
-            <div className="h-8 w-8 rounded-full bg-gradient-to-br from-primary to-chart-1/80" />
+            <div className="h-8 w-8 rounded-full bg-linear-to-br from-primary to-chart-1/80" />
           </div>
         </header>
 

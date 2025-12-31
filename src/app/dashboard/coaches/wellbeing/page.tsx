@@ -17,7 +17,7 @@ export default function WellbeingCoachPage() {
 
             <div className="mt-6 flex flex-wrap gap-3">
               <Link href="/dashboard/coaches/wellbeing/session" className="inline-block">
-                <button className="inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold bg-gradient-to-r from-sky-400 to-indigo-400 text-slate-900 shadow">
+                <button className="inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold bg-linear-to-r from-sky-400 to-indigo-400 text-slate-900 shadow">
                   Start wellbeing session
                 </button>
               </Link>

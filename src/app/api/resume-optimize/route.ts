@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { rateLimit } from "../../../lib/rateLimit";
+import { getOrCreateSessionUserId } from "../../../lib/session";
 
 export const runtime = "nodejs";
 
@@ -8,6 +10,11 @@ type ReqBody = {
   targetRole: string;
   location?: string;
 };
+
+function errToString(err: unknown) {
+  if (err instanceof Error) return err.message;
+  return String(err);
+}
 
 function extractJsonFromString(s: string) {
   try {
@@ -23,6 +30,16 @@ function extractJsonFromString(s: string) {
 
 export async function POST(req: Request) {
   try {
+    const rl = rateLimit(req, { key: "api:resume-optimize", limit: 6, windowMs: 60_000 });
+    if (!rl.ok) {
+      return NextResponse.json(
+        { error: "rate_limited" },
+        { status: 429, headers: { "Retry-After": String(Math.ceil((rl.resetMs - Date.now()) / 1000)) } }
+      );
+    }
+
+    const { setCookie } = getOrCreateSessionUserId(req);
+
     const body: ReqBody = await req.json();
     if (!body.resumeText || !body.jobDesc || !body.targetRole) {
       return NextResponse.json({ error: "resumeText, jobDesc and targetRole are required" }, { status: 400 });
@@ -32,6 +49,8 @@ export async function POST(req: Request) {
     if (!apiKey) {
       return NextResponse.json({ error: "OpenAI API key not configured on server" }, { status: 500 });
     }
+
+    const model = process.env.OPENAI_MODEL || "gpt-4o-mini";
 
     const systemPrompt = `
 You are an expert resume optimizer and ATS specialist. Given a candidate resume, job description, and target role, return ONLY a single valid JSON object (no surrounding text) with these keys:
@@ -67,7 +86,7 @@ Respond only with the JSON described above.
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "gpt-4o-mini", // you can change to gpt-4/gpt-3.5-turbo as available
+        model,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
@@ -98,8 +117,10 @@ Respond only with the JSON described above.
       optimized_resume: parsed.optimized_resume ?? "",
     };
 
-    return NextResponse.json({ result });
-  } catch (err: any) {
-    return NextResponse.json({ error: String(err?.message ?? err) }, { status: 500 });
+    const out = NextResponse.json({ result });
+    if (setCookie) out.headers.set("Set-Cookie", setCookie);
+    return out;
+  } catch (err: unknown) {
+    return NextResponse.json({ error: errToString(err) }, { status: 500 });
   }
 }

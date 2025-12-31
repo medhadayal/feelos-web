@@ -81,7 +81,7 @@ export default function AIAvatarChat() {
     <div className="space-y-3">
       <div ref={chatRef} className="h-72 overflow-auto bg-black/20 p-3 rounded-lg space-y-2">
         {messages.map((m, i) => (
-          <div key={i} className={`p-2 rounded ${m.role === "user" ? "bg-gradient-to-r from-purple-600 to-pink-500 text-white ml-auto max-w-[80%]" : "bg-white/5 text-slate-100 max-w-[80%]"}`}>
+          <div key={i} className={`p-2 rounded ${m.role === "user" ? "bg-linear-to-r from-purple-600 to-pink-500 text-white ml-auto max-w-[80%]" : "bg-white/5 text-slate-100 max-w-[80%]"}`}>
             <div className="whitespace-pre-wrap">{m.content || "..."}</div>
           </div>
         ))}
@@ -89,7 +89,7 @@ export default function AIAvatarChat() {
 
       <div className="flex gap-2">
         <textarea value={input} onChange={(e) => setInput(e.target.value)} className="flex-1 rounded p-2 bg-black/10" rows={2} />
-        <button onClick={send} disabled={sending || !input.trim()} className="px-4 py-2 rounded bg-gradient-to-r from-pink-500 to-yellow-300 text-slate-900">
+        <button onClick={send} disabled={sending || !input.trim()} className="px-4 py-2 rounded bg-linear-to-r from-pink-500 to-yellow-300 text-slate-900">
           {sending ? "Sending…" : "Send"}
         </button>
       </div>

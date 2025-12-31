@@ -83,7 +83,6 @@ if (dbUrl) {
       const host = u.hostname || 'localhost';
       const port = Number(u.port || 5432);
       console.log(`Checking DB connectivity to ${host}:${port} ...`);
-      // eslint-disable-next-line no-console
       const ok = await canConnect(host, port, 2500);
       if (!ok) {
         console.warn(`DB not reachable at ${host}:${port}. Skipping migrate/seed. App will run with in-memory fallback until the DB is available.`);

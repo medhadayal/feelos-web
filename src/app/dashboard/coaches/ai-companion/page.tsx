@@ -1,316 +1,467 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 
-/**
- * Local-only AI Companion (no OpenAI / no server calls)
- * - Polished FAANG-like UI
- * - Local reply generator (heuristics + canned responses)
- * - Simulated streaming (chunking) for progressive rendering
- * - Optional TTS (Web Speech) — client-side only
- */
-
-/* ----- Types & helpers ----- */
 type Role = "user" | "assistant" | "system";
-type Message = { id: string; role: Role; text: string; time: string };
+type ChatMessage = { id: string; role: Role; text: string };
+type ChatThread = { id: string; title: string; messages: ChatMessage[]; updatedAt: number };
 
-const uid = (p = "") => p + Math.random().toString(36).slice(2, 9);
-const now = () => new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+const STORAGE_KEY = "feelos.aiCompanion.threads.v1";
 
-/* Small local "AI" engine — deterministic, safe, offline */
-function localAssistantReply(userText: string, mood: string) {
-  // Simple heuristics + canned suggestions
-  const lower = userText.toLowerCase();
-  if (!userText.trim()) return "Hi — tell me what's on your mind and I'll help you break it down.";
+const uid = (p = "") => p + Math.random().toString(36).slice(2, 10);
 
-  if (lower.includes("resume") || lower.includes("cv")) {
-    return `I can help with your resume. Share a key bullet or role and I'll suggest improvements (quantify impact, add keywords, shorten where possible).`;
+function safeJsonParse<T>(s: string): T | null {
+  try {
+    return JSON.parse(s) as T;
+  } catch {
+    return null;
   }
-  if (lower.includes("interview") || lower.includes("practice")) {
-    return `Let's do a quick mock interview: tell me the role and I'll ask a common question. We'll iterate on your answers.`;
-  }
-  if (lower.includes("anxious") || lower.includes("anxiety") || mood === "concerned") {
-    return `I hear you're feeling anxious. Try a 2‑minute grounding exercise: 4s breath in, hold 4s, 6s out. Want me to guide you through it?`;
-  }
-  // fallback constructive reply
-  const suggestions = [
-    "Break tasks into 15‑minute blocks and focus on one at a time.",
-    "Try a short breathing exercise to reset your mind.",
-    "Write down a single next action and do that one thing now."
-  ];
-  return `Thanks — here's a quick plan:\n\n1) ${suggestions[0]}\n2) ${suggestions[1]}\n3) ${suggestions[2]}\n\nWhich step would you like to try?`;
 }
 
-/* chunk text into pieces for simulated streaming */
-function chunkText(text: string, size = 40) {
-  const out: string[] = [];
-  for (let i = 0; i < text.length; i += size) out.push(text.slice(i, i + size));
-  return out;
-}
+function useSpeechRecognition() {
+  type SpeechRecognitionInstance = {
+    continuous: boolean;
+    interimResults: boolean;
+    lang: string;
+    start: () => void;
+    stop: () => void;
+    onresult: null | ((ev: unknown) => void);
+    onerror: null | ((ev: unknown) => void);
+    onend: null | (() => void);
+  };
 
-/* ----- Main component (local-only) ----- */
-export default function AICompanionLocal() {
-  const [messages, setMessages] = useState<Message[]>(
-    [
-      { id: uid("m_"), role: "assistant", text: "Hello — I'm your FeelOS Companion (local mode). How can I help today?", time: now() },
-    ]
-  );
-  const [input, setInput] = useState("");
-  const [isTyping, setIsTyping] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [ttsEnabled, setTtsEnabled] = useState(false);
-  const [mood, setMood] = useState<"happy" | "neutral" | "concerned">("neutral");
-  const [focus, setFocus] = useState(["Plan routine", "Deep work", "Inbox triage"]);
-  const [selfCare, setSelfCare] = useState("5‑minute breathing");
-  const chatRef = useRef<HTMLDivElement | null>(null);
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
+  const [listening, setListening] = useState(false);
+
+  const supported =
+    typeof window !== "undefined" &&
+    !!(((window as unknown as { SpeechRecognition?: unknown }).SpeechRecognition) ||
+      ((window as unknown as { webkitSpeechRecognition?: unknown }).webkitSpeechRecognition));
 
   useEffect(() => {
-    chatRef.current?.scrollTo({ top: chatRef.current.scrollHeight, behavior: "smooth" });
-  }, [messages, isTyping]);
+    if (!supported) return;
 
-  /* Keyboard: Ctrl/Cmd+Enter to send */
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
-        e.preventDefault();
-        send();
+    const w = window as unknown as { SpeechRecognition?: unknown; webkitSpeechRecognition?: unknown };
+    const Ctor = (w.SpeechRecognition ?? w.webkitSpeechRecognition) as new () => SpeechRecognitionInstance;
+
+    const r = new Ctor();
+    r.continuous = true;
+    r.interimResults = false;
+    r.lang = "en-US";
+    recognitionRef.current = r;
+    return () => {
+      try {
+        r.onresult = null;
+        r.onerror = null;
+        r.onend = null;
+        r.stop?.();
+      } catch {
+        // ignore
       }
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [input, messages]);
+      recognitionRef.current = null;
+    };
+  }, [supported]);
 
-  function pushMessage(role: Role, text: string) {
-    const msg = { id: uid("m_"), role, text, time: now() };
-    setMessages((s) => [...s, msg]);
-    return msg;
-  }
-
-  async function send() {
-    const text = input.trim();
-    if (!text) return;
-    setInput("");
-    // append user message immediately
-    setMessages((m) => [...m, { id: uid("m_"), role: "user", text, time: now() }]);
-
-    setLoading(true);
-    setIsTyping(true);
+  const start = useCallback((onText: (t: string) => void, onError?: (msg: string) => void) => {
+    const r = recognitionRef.current;
+    if (!r) return;
+    r.onresult = (ev: unknown) => {
+      try {
+        const e = ev as { results?: ArrayLike<ArrayLike<{ transcript?: unknown }>> };
+        const results = e.results;
+        const last = results && results.length ? results[results.length - 1] : null;
+        const transcript = last && last.length ? last[0]?.transcript : "";
+        const text = String(transcript).trim();
+        if (text) onText(text);
+      } catch {
+        // ignore
+      }
+    };
+    r.onerror = (ev: unknown) => {
+      const e = ev as { error?: unknown };
+      onError?.(String(e?.error ?? "Speech recognition error"));
+    };
+    r.onend = () => {
+      setListening(false);
+    };
     try {
-      const res = await fetch("/api/companion/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId: "user_1",
-          messages: [...messages, { id: "tmp", role: "user", text, time: now() }].map(x => ({ role: x.role as any, content: x.text })),
-        }),
-      });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: "Network" }));
-        setMessages((m) => [...m, { id: uid("m_"), role: "assistant", text: `[Error] ${err?.error || "Unable to get reply"}`, time: now() }]);
-        return;
-      }
-
-      const json = await res.json();
-      const replyText: string = json?.reply ?? "Sorry — no reply.";
-
-      // progressive client-side streaming (chunk the reply)
-      const chunks: string[] = [];
-      const size = 36;
-      for (let i = 0; i < replyText.length; i += size) chunks.push(replyText.slice(i, i + size));
-
-      const assistId = uid("m_");
-      setMessages((m) => [...m, { id: assistId, role: "assistant", text: "", time: now() }]);
-      for (const chunk of chunks) {
-        setMessages((prev) => {
-          const copy = [...prev];
-          const idx = copy.findIndex(x => x.id === assistId);
-          if (idx >= 0) copy[idx] = { ...copy[idx], text: copy[idx].text + chunk, time: now() };
-          else copy.push({ id: assistId, role: "assistant", text: chunk, time: now() });
-          return copy;
-        });
-        if (ttsEnabled && chunk.trim() && 'speechSynthesis' in window) {
-          const u = new SpeechSynthesisUtterance(chunk);
-          u.lang = "en-US";
-          window.speechSynthesis.speak(u);
-        }
-        await new Promise(r => setTimeout(r, 100));
-      }
-
-    } catch (err: any) {
-      setMessages((m) => [...m, { id: uid("m_"), role: "assistant", text: `[Error] ${String(err?.message ?? err)}`, time: now() }]);
-    } finally {
-      setLoading(false);
-      setIsTyping(false);
+      setListening(true);
+      r.start();
+    } catch {
+      setListening(false);
     }
-  }
+  }, []);
 
-  function quickAction(text: string) {
-    setInput(text);
-    setTimeout(() => send(), 80);
-  }
+  const stop = useCallback(() => {
+    const r = recognitionRef.current;
+    if (!r) return;
+    try {
+      r.stop();
+    } catch {
+      // ignore
+    }
+    setListening(false);
+  }, []);
 
-  function logMood(newMood: "happy" | "neutral" | "concerned") {
-    setMood(newMood);
-    // local-only: no network call
-    pushMessage("system", `Mood logged: ${newMood}`);
+  return { supported, listening, start, stop };
+}
+
+export default function AICompanionPage() {
+  const [threads, setThreads] = useState<ChatThread[]>([]);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [input, setInput] = useState("");
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const [audioCallOn, setAudioCallOn] = useState(false);
+  const [videoCallOn, setVideoCallOn] = useState(false);
+  const [ttsOn, setTtsOn] = useState(true);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const chatScrollRef = useRef<HTMLDivElement | null>(null);
+
+  const speech = useSpeechRecognition();
+
+  const activeThread = useMemo(() => threads.find((t) => t.id === activeId) ?? null, [threads, activeId]);
+
+  useEffect(() => {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    const parsed = raw ? safeJsonParse<ChatThread[]>(raw) : null;
+    if (parsed && Array.isArray(parsed) && parsed.length) {
+      setThreads(parsed);
+      setActiveId(parsed[0].id);
+      return;
+    }
+
+    const first: ChatThread = {
+      id: uid("t_"),
+      title: "New chat",
+      updatedAt: Date.now(),
+      messages: [
+        { id: uid("m_"), role: "assistant", text: "Hi — I’m your FeelOS AI Companion. Ask me anything." },
+      ],
+    };
+    setThreads([first]);
+    setActiveId(first.id);
+  }, []);
+
+  useEffect(() => {
+    if (!threads.length) return;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(threads));
+  }, [threads]);
+
+  useEffect(() => {
+    chatScrollRef.current?.scrollTo({ top: chatScrollRef.current.scrollHeight, behavior: "smooth" });
+  }, [activeId, activeThread?.messages.length]);
+
+  const speak = useCallback(
+    (text: string) => {
+      if (!ttsOn) return;
+      if (typeof window === "undefined") return;
+      if (!("speechSynthesis" in window)) return;
+      try {
+        window.speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(text);
+        u.lang = "en-US";
+        u.rate = 1;
+        window.speechSynthesis.speak(u);
+      } catch {
+        // ignore
+      }
+    },
+    [ttsOn]
+  );
+
+  const sendMessage = useCallback(
+    async (forcedText?: string) => {
+      const text = (forcedText ?? input).trim();
+      if (!text || sending) return;
+      setError(null);
+      setInput("");
+
+      const threadId = activeId ?? threads[0]?.id;
+      if (!threadId) return;
+
+      const userMsg: ChatMessage = { id: uid("m_"), role: "user", text };
+      setThreads((prev) =>
+        prev.map((t) =>
+          t.id === threadId
+            ? {
+                ...t,
+                title: t.title === "New chat" ? text.slice(0, 32) : t.title,
+                updatedAt: Date.now(),
+                messages: [...t.messages, userMsg],
+              }
+            : t
+        )
+      );
+
+      setSending(true);
+      try {
+        const baseMessages = (activeThread?.messages ?? []).concat(userMsg);
+        const payloadMessages = [
+          {
+            role: "system",
+            content:
+              "You are FeelOS AI Companion. Be helpful, direct, and safe. Answer the user’s question clearly. If the user asks for something impossible in-app, suggest a workaround.",
+          },
+          ...baseMessages
+            .filter((m) => m.role === "user" || m.role === "assistant")
+            .map((m) => ({ role: m.role, content: m.text })),
+        ];
+
+        const res = await fetch("/api/ai/infer", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ messages: payloadMessages }),
+        });
+
+        const json = (await res.json().catch(() => ({}))) as { reply?: unknown; error?: unknown };
+        if (!res.ok) {
+          setError(String(json?.error ?? "AI request failed"));
+          return;
+        }
+
+        const reply = String(json?.reply ?? "").trim() || "(No reply)";
+        const assistMsg: ChatMessage = { id: uid("m_"), role: "assistant", text: reply };
+        setThreads((prev) =>
+          prev.map((t) =>
+            t.id === threadId ? { ...t, updatedAt: Date.now(), messages: [...t.messages, assistMsg] } : t
+          )
+        );
+        if (audioCallOn) speak(reply);
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        setError(msg);
+      } finally {
+        setSending(false);
+      }
+    },
+    [activeId, activeThread?.messages, audioCallOn, input, sending, speak, threads]
+  );
+
+  useEffect(() => {
+    if (!audioCallOn) {
+      speech.stop();
+      return;
+    }
+    if (!speech.supported) {
+      setError("Audio call requires Speech Recognition (Chrome/Edge). You can still type.");
+      setAudioCallOn(false);
+      return;
+    }
+    speech.start(
+      (t) => {
+        setInput(t);
+        // auto-send after a short tick so state updates
+        setTimeout(() => {
+          void sendMessage(t);
+        }, 0);
+      },
+      (msg) => {
+        setError(msg);
+      }
+    );
+  }, [audioCallOn, sendMessage, speech]);
+
+  useEffect(() => {
+    async function startCamera() {
+      setCameraError(null);
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        mediaStreamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          await videoRef.current.play().catch(() => undefined);
+        }
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        setCameraError(msg);
+        setVideoCallOn(false);
+      }
+    }
+
+    function stopCamera() {
+      const s = mediaStreamRef.current;
+      if (s) {
+        for (const track of s.getTracks()) track.stop();
+      }
+      mediaStreamRef.current = null;
+      if (videoRef.current) videoRef.current.srcObject = null;
+    }
+
+    if (videoCallOn) void startCamera();
+    else stopCamera();
+
+    return () => stopCamera();
+  }, [videoCallOn]);
+
+  function newChat() {
+    const t: ChatThread = {
+      id: uid("t_"),
+      title: "New chat",
+      updatedAt: Date.now(),
+      messages: [{ id: uid("m_"), role: "assistant", text: "Hi — what do you want to work on?" }],
+    };
+    setThreads((prev) => [t, ...prev]);
+    setActiveId(t.id);
+    setError(null);
   }
 
   return (
-    <div className="min-h-screen w-full bg-[linear-gradient(180deg,#050816,#0b1221,#020617)] text-white flex items-center justify-center p-4">
-      <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Avatar / Intro */}
-        <aside className="lg:col-span-4 flex flex-col items-center lg:items-start gap-6">
-          <div className="flex flex-col items-center lg:items-start gap-4">
-            <div className="rounded-full p-1 bg-gradient-to-br from-white/6 to-white/3 shadow-2xl hover:scale-105 transition-transform">
-              {/* Cartoon character avatar (inline SVG) */}
-              <svg viewBox="0 0 160 160" className="w-36 h-36 rounded-full" role="img" aria-label="FeelOS cartoon avatar">
-                <defs>
-                  <linearGradient id="gradA" x1="0" x2="1">
-                    <stop offset="0%" stopColor="#FF8AA2" />
-                    <stop offset="100%" stopColor="#FFD76B" />
-                  </linearGradient>
-                </defs>
-                <circle cx="80" cy="80" r="76" fill="url(#gradA)" />
-                {/* friendly face */}
-                <ellipse cx="56" cy="72" rx="8" ry="10" fill="#fff" />
-                <ellipse cx="104" cy="72" rx="8" ry="10" fill="#fff" />
-                <circle cx="56" cy="74" r="3.5" fill="#0b1220" />
-                <circle cx="104" cy="74" r="3.5" fill="#0b1220" />
-                <path d="M56 98 C72 114, 88 114, 104 98" stroke="#0b1220" strokeWidth="4" fill="none" strokeLinecap="round" />
-              </svg>
-            </div>
-            <div className="text-center lg:text-left">
-              <h2 className="text-2xl font-semibold">FeelOS Companion (Local)</h2>
-              <p className="text-sm text-slate-300 mt-1 max-w-[20rem]">Offline companion for guidance, micro-actions and quick planning — no external AI required.</p>
-            </div>
+    <div className="min-h-[calc(100vh-2rem)] w-full text-white">
+      <div className="h-[calc(100vh-2rem)] rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl overflow-hidden grid grid-cols-1 md:grid-cols-[280px_1fr]">
+        {/* Sidebar */}
+        <aside className="hidden md:flex flex-col border-r border-white/10 bg-black/20">
+          <div className="p-3 border-b border-white/10">
+            <button
+              onClick={newChat}
+              className="w-full rounded-md bg-white/6 hover:bg-white/10 px-3 py-2 text-sm font-medium"
+            >
+              New chat
+            </button>
           </div>
-
-          <div className="w-full space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="text-xs text-slate-300">Mood</div>
-              <div className="text-xs text-slate-300">{mood}</div>
-            </div>
-
-            <div className="flex gap-2">
-              <button onClick={() => logMood("happy")} className="px-3 py-1 rounded-full bg-amber-300 text-slate-900 text-sm">Happy</button>
-              <button onClick={() => logMood("neutral")} className="px-3 py-1 rounded-full bg-white/6 text-sm">Neutral</button>
-              <button onClick={() => logMood("concerned")} className="px-3 py-1 rounded-full bg-rose-600 text-white text-sm">Concerned</button>
-            </div>
-
-            <div className="mt-2 bg-white/5 border border-white/6 p-3 rounded">
-              <div className="text-xs text-slate-400">Today focus</div>
-              <ol className="list-decimal ml-5 mt-2 text-sm">
-                {focus.map((f, i) => <li key={i}>{f}</li>)}
-              </ol>
-              <div className="mt-2 text-sm">Self-care: <strong>{selfCare}</strong></div>
-            </div>
+          <div className="flex-1 overflow-auto p-2 space-y-1">
+            {threads.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => setActiveId(t.id)}
+                className={`w-full text-left rounded-md px-3 py-2 text-sm ${t.id === activeId ? "bg-white/10" : "hover:bg-white/6"}`}
+                title={t.title}
+              >
+                <div className="truncate">{t.title || "New chat"}</div>
+              </button>
+            ))}
+          </div>
+          <div className="p-3 border-t border-white/10 text-xs text-slate-300">
+            Uses your configured AI model server-side.
           </div>
         </aside>
 
-        {/* Chat area */}
-        <main className="lg:col-span-8 flex flex-col">
-          <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl shadow-xl p-4 flex-1 flex flex-col">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <div className="text-xs text-slate-300">FeelOS (Local)</div>
-                <div className="text-lg font-semibold">Chat & micro-actions</div>
-              </div>
-              <div className="flex items-center gap-3">
-                <label className="text-xs text-slate-300 flex items-center gap-2">
-                  <input type="checkbox" checked={ttsEnabled} onChange={(e) => setTtsEnabled(e.target.checked)} className="accent-pink-400" />
-                  <span>Speech</span>
-                </label>
-              </div>
+        {/* Main */}
+        <main className="flex flex-col">
+          {/* Top bar */}
+          <div className="flex items-center justify-between gap-3 p-3 border-b border-white/10 bg-black/10">
+            <div className="min-w-0">
+              <div className="text-sm font-semibold truncate">AI Companion</div>
+              <div className="text-xs text-slate-300 truncate">{activeThread?.title ?? "New chat"}</div>
             </div>
 
-            {/* quick action chips */}
-            <div className="mb-3 flex flex-wrap gap-3">
-              <QuickChip label="I feel anxious" onClick={() => quickAction("I feel anxious")} />
-              <QuickChip label="Draft message" onClick={() => quickAction("Draft a short message")} />
-              <QuickChip label="Plan my day" onClick={() => quickAction("Help me plan my day")} />
-            </div>
+            <div className="flex items-center gap-2 flex-wrap justify-end">
+              <button
+                onClick={() => setTtsOn((v) => !v)}
+                className={`px-3 py-2 rounded-md text-xs bg-white/6 hover:bg-white/10 ${ttsOn ? "" : "opacity-70"}`}
+              >
+                Audio
+              </button>
 
-            {/* chat log */}
-            <div ref={chatRef} className="flex-1 overflow-auto space-y-4 p-2" role="log" aria-live="polite">
-              {messages.map((m) => (
-                <div key={m.id} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"} px-2`}>
-                  <div className={`max-w-[80%] rounded-lg p-3 ${m.role === "user" ? "bg-gradient-to-r from-purple-600 to-pink-500 text-white" : "bg-black/40 border border-white/6 text-slate-100"}`}>
-                    <div className="whitespace-pre-wrap text-sm">{m.text || <MessageSkeleton />}</div>
-                    <div className="text-xs text-slate-400 mt-2 text-right">{m.time}</div>
-                  </div>
+              <button
+                onClick={() => setAudioCallOn((v) => !v)}
+                className={`px-3 py-2 rounded-md text-xs ${audioCallOn ? "bg-linear-to-r from-green-400 to-teal-400 text-slate-900" : "bg-white/6 hover:bg-white/10"}`}
+              >
+                {audioCallOn ? "End audio call" : "Audio call"}
+              </button>
+
+              <button
+                onClick={() => setVideoCallOn((v) => !v)}
+                className={`px-3 py-2 rounded-md text-xs ${videoCallOn ? "bg-linear-to-r from-pink-500 to-yellow-300 text-slate-900" : "bg-white/6 hover:bg-white/10"}`}
+              >
+                {videoCallOn ? "End video call" : "Video call"}
+              </button>
+
+              <span className="hidden sm:inline-flex text-xs px-2 py-1 rounded-full bg-white/6 text-slate-300 border border-white/10 ml-1">Guest mode</span>
+              <Link
+                href="/login"
+                className="hidden sm:inline-flex text-xs px-3 py-2 rounded-md bg-white/6 hover:bg-white/10 border border-white/10"
+              >
+                Sign in
+              </Link>
+            </div>
+          </div>
+
+          {/* Call area */}
+          {videoCallOn && (
+            <div className="p-3 border-b border-white/10 bg-black/10">
+              <div className="flex items-start gap-3">
+                <video ref={videoRef} muted playsInline className="w-44 h-28 rounded-lg bg-black/40 border border-white/10 object-cover" />
+                <div className="text-xs text-slate-300">
+                  <div className="font-medium text-white">Video call</div>
+                  <div className="mt-1">Camera preview is local only. Use the chat to talk to the AI.</div>
+                  {cameraError && <div className="mt-2 text-amber-200">Camera error: {cameraError}</div>}
                 </div>
-              ))}
-
-              {isTyping && (
-                <div className="flex justify-start px-2">
-                  <div className="bg-black/40 rounded-lg p-3">
-                    <TypingDots />
-                  </div>
-                </div>
-              )}
+              </div>
             </div>
+          )}
 
-            {/* input bar */}
-            <div className="mt-4 pt-4 border-t border-white/6">
-              <div className="flex items-end gap-3">
-                <textarea
-                  ref={textareaRef}
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  placeholder="Ask FeelOS anything..."
-                  rows={3}
-                  className="flex-1 rounded-md bg-black/20 px-4 py-3 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-pink-400 resize-none"
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
-                  }}
-                />
-                <button onClick={send} disabled={!input.trim()} className={`px-4 py-3 rounded-lg font-semibold ${input.trim() ? "bg-gradient-to-r from-pink-500 to-yellow-300 text-slate-900" : "bg-white/6 text-slate-400 cursor-not-allowed"}`}>
-                  Send
-                </button>
+          {/* Messages */}
+          <div ref={chatScrollRef} className="flex-1 overflow-auto p-4 space-y-4 bg-[linear-gradient(180deg,#050816,#0b1221,#020617)]">
+            {(activeThread?.messages ?? []).map((m) => (
+              <div key={m.id} className={m.role === "user" ? "flex justify-end" : "flex justify-start"}>
+                <div
+                  className={
+                    m.role === "user"
+                      ? "max-w-[85%] rounded-2xl px-4 py-3 bg-white/10 border border-white/10"
+                      : "max-w-[85%] rounded-2xl px-4 py-3 bg-black/30 border border-white/10"
+                  }
+                >
+                  <div className="whitespace-pre-wrap text-sm text-slate-100">{m.text}</div>
+                </div>
               </div>
-              <div className="mt-2 text-xs text-slate-400 flex items-center justify-between">
-                <div>Tip: Press Enter to send. Ctrl/Cmd+Enter also works.</div>
-                <div className="text-amber-300">Local mode — offline replies</div>
+            ))}
+
+            {sending && (
+              <div className="flex justify-start">
+                <div className="max-w-[85%] rounded-2xl px-4 py-3 bg-black/30 border border-white/10 text-sm text-slate-300">
+                  Thinking…
+                </div>
               </div>
+            )}
+          </div>
+
+          {/* Composer */}
+          <div className="border-t border-white/10 bg-black/20 p-3">
+            {error && (
+              <div className="mb-3 rounded-xl bg-white/5 border border-white/10 p-3 text-sm text-amber-200">
+                {error}
+              </div>
+            )}
+            {!speech.supported && audioCallOn === false && (
+              <div className="mb-3 text-xs text-slate-400">Voice input requires Chrome/Edge (Speech Recognition).</div>
+            )}
+            {audioCallOn && (
+              <div className="mb-3 text-xs text-slate-300">{speech.listening ? "Listening… speak now" : "Starting audio call…"}</div>
+            )}
+            <div className="flex items-end gap-3">
+              <textarea
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                rows={2}
+                placeholder="Message AI Companion…"
+                className="flex-1 rounded-xl bg-black/30 border border-white/10 px-4 py-3 text-sm resize-none focus:outline-none"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    void sendMessage();
+                  }
+                }}
+              />
+              <button
+                onClick={() => void sendMessage()}
+                disabled={!input.trim() || sending}
+                className={`px-4 py-3 rounded-xl text-sm font-semibold ${input.trim() && !sending ? "bg-linear-to-r from-pink-500 to-yellow-300 text-slate-900" : "bg-white/6 text-slate-400 cursor-not-allowed"}`}
+              >
+                Send
+              </button>
+            </div>
+            <div className="mt-2 text-xs text-slate-400 flex items-center justify-between">
+              <div>Enter to send, Shift+Enter for newline.</div>
+              <div className="md:hidden">Uses your configured AI model server-side.</div>
             </div>
           </div>
         </main>
       </div>
     </div>
   );
-}
-
-/* ----- UI helpers ----- */
-
-function QuickChip({ label, onClick }: { label: string; onClick: () => void }) {
-  return (
-    <button onClick={onClick} className="px-3 py-2 rounded-lg bg-white/6 text-sm transition-all duration-200 hover:shadow-2xl hover:-translate-y-0.5">
-      {label}
-    </button>
-  );
-}
-
-function TypingDots() {
-  return (
-    <div className="flex items-center gap-1">
-      <span className="w-2.5 h-2.5 bg-white rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-      <span className="w-2.5 h-2.5 bg-white rounded-full animate-bounce" style={{ animationDelay: "120ms" }} />
-      <span className="w-2.5 h-2.5 bg-white rounded-full animate-bounce" style={{ animationDelay: "240ms" }} />
-    </div>
-  );
-}
-
-function MessageSkeleton() {
-  return (
-    <div className="space-y-2">
-      <div className="h-3 w-3/4 rounded bg-white/8 animate-pulse" />
-      <div className="h-3 w-1/2 rounded bg-white/8 animate-pulse" />
-    </div>
-  );
-}
-
-function QuickActionPlaceholder() {
-  return null;
 }

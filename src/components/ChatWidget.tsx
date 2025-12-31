@@ -35,7 +35,7 @@ export default function ChatWidget() {
       } else {
         setMessages((m) => [...m, { role: "assistant", content: `Error: ${json.error || "No response"}` }]);
       }
-    } catch (e) {
+    } catch {
       setMessages((m) => [...m, { role: "assistant", content: "Network error — try again." }]);
     } finally {
       setLoading(false);
@@ -65,7 +65,7 @@ export default function ChatWidget() {
 
         <div className="flex gap-2">
           <input
-            className="flex-1 rounded-md bg-black/20 px-3 py-2 outline-none focus:ring-2 focus:ring-[var(--ring)]"
+            className="flex-1 rounded-md bg-black/20 px-3 py-2 outline-none focus:ring-2 focus:ring-ring"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") send(); }}
@@ -76,7 +76,7 @@ export default function ChatWidget() {
           <button
             onClick={send}
             disabled={loading}
-            className="rounded-md bg-gradient-to-r from-pink-500 to-yellow-300 px-4 text-sm font-semibold"
+            className="rounded-md bg-linear-to-r from-pink-500 to-yellow-300 px-4 text-sm font-semibold"
           >
             Send
           </button>
