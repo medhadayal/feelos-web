@@ -5,6 +5,7 @@ import Link from 'next/link';
 import ResumeOptimizer from '../../../../components/career/ResumeOptimizer';
 import LinkedinOptimizer from '../../../../components/career/LinkedinOptimizer';
 import CoverLetterGenerator from '../../../../components/career/CoverLetterGenerator';
+import { Briefcase } from 'lucide-react';
 
 type CareerTab = 'overview' | 'resume' | 'linkedin' | 'cover' | 'interview' | 'tracker' | 'portfolio';
 
@@ -61,7 +62,12 @@ export default function CareerCoachPage() {
         {/* Hero */}
         <div className="mb-6 flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-semibold">Career Coach</h1>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-linear-to-br from-pink-500 to-yellow-300 flex items-center justify-center" aria-hidden>
+                <Briefcase className="w-5 h-5 text-slate-900" />
+              </div>
+              <h1 className="text-3xl font-semibold">Career Coach</h1>
+            </div>
             <p className="text-sm text-slate-300 mt-2 max-w-2xl">Personalized career guidance: resume reviews, interview practice and upskilling plans.</p>
           </div>
           <div className="flex items-center gap-2">

@@ -2,6 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
+import { Scale } from 'lucide-react';
 
 export default function WorklifeCoachPage() {
   return (
@@ -10,7 +11,12 @@ export default function WorklifeCoachPage() {
         {/* Hero */}
         <div className="mb-8 grid grid-cols-1 lg:grid-cols-3 gap-6 items-center">
           <div className="lg:col-span-2">
-            <h1 className="text-3xl font-semibold">Work‑Life Balance Coach</h1>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-linear-to-br from-green-400 to-teal-300 flex items-center justify-center" aria-hidden>
+                <Scale className="w-5 h-5 text-slate-900" />
+              </div>
+              <h1 className="text-3xl font-semibold">Work‑Life Balance Coach</h1>
+            </div>
             <p className="text-sm text-slate-300 mt-2 max-w-2xl">
               Tools and templates to set boundaries, plan work, and protect your personal time to reduce burnout.
             </p>

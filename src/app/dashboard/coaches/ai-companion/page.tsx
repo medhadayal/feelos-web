@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { Bot } from "lucide-react";
 
 type Role = "user" | "assistant" | "system";
 type ChatMessage = { id: string; role: Role; text: string };
@@ -345,7 +346,12 @@ export default function AICompanionPage() {
           {/* Top bar */}
           <div className="flex items-center justify-between gap-3 p-3 border-b border-white/10 bg-black/10">
             <div className="min-w-0">
-              <div className="text-sm font-semibold truncate">AI Companion</div>
+              <div className="flex items-center gap-2 text-sm font-semibold truncate">
+                <span className="inline-flex w-7 h-7 rounded-md bg-linear-to-br from-violet-500 to-indigo-400 items-center justify-center" aria-hidden>
+                  <Bot className="w-4 h-4 text-slate-900" />
+                </span>
+                <span className="truncate">AI Companion</span>
+              </div>
               <div className="text-xs text-slate-300 truncate">{activeThread?.title ?? "New chat"}</div>
             </div>
 

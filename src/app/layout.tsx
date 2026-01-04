@@ -18,7 +18,10 @@ export const metadata: Metadata = {
   title: "FeelOS",
   description: "Where Technology Feels Human",
   icons: {
-    icon: "/favicon.jpeg",
+    icon: [
+      { url: "/favicon.ico", type: "image/x-icon" },
+      { url: "/favicon.png", type: "image/png" },
+    ],
   },
 };
 
@@ -30,15 +33,16 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        <link rel="icon" href="/favicon.jpeg" type="image/jpeg" />
-        <link rel="apple-touch-icon" href="/favicon.jpeg" />
+        <link rel="icon" href="/favicon.ico" sizes="any" />
+        <link rel="icon" href="/favicon.png" type="image/png" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
         {/* persistent header showing logo on all pages */}
         <header className="fixed top-4 left-1/2 transform -translate-x-1/2 z-40 w-full max-w-7xl px-4">
           <div className="flex items-center justify-between">
             <Link href="/" aria-label="FeelOS home" className="flex items-center gap-3">
-              <Image src="/logo.jpeg" alt="FeelOS" width={40} height={40} className="rounded-md object-contain" priority />
+              <Image src="/logo.png" alt="FeelOS" width={40} height={40} className="rounded-md object-contain" priority />
               <span className="hidden sm:inline-block font-semibold">FeelOS</span>
             </Link>
 

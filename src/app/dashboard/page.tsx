@@ -4,6 +4,7 @@
 import React from "react";
 import Link from "next/link";
 import AuthGuard from "../../components/AuthGuard";
+import { Briefcase, Bot, Heart, Scale } from "lucide-react";
 
 export default function DashboardPage() {
 	// changed: add comingSoon flag for wellbeing & worklife
@@ -13,6 +14,13 @@ export default function DashboardPage() {
 		{ id: 'worklife', title: 'Work‑Life Balance', desc: 'Boundary setting & workload planning.', cta: 'Try Now', accent: 'from-green-400 to-teal-300', href: '/dashboard/coaches/worklife', comingSoon: true },
 		{ id: 'ai', title: 'AI Companion', desc: 'Conversational companion for reminders & suggestions.', cta: 'Chat Now', accent: 'from-violet-500 to-indigo-400', href: '/dashboard/coaches/ai-companion', comingSoon: false },
 	];
+
+	const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
+		career: Briefcase,
+		wellbeing: Heart,
+		worklife: Scale,
+		ai: Bot,
+	};
 
 	return (
 		<AuthGuard>
@@ -38,6 +46,7 @@ export default function DashboardPage() {
 						style={{ minHeight: 'calc(100vh - 6rem)' }} // leaves space for header (h-16 + padding)
 					>
 						{coaches.map((c) => {
+							const Icon = iconMap[c.id] ?? Bot;
 							const card = (
 								<div
 									key={c.id}
@@ -48,8 +57,8 @@ export default function DashboardPage() {
 								>
 									<div className="flex items-start justify-between">
 										<div className="flex items-center gap-4">
-											<div className={`w-14 h-14 rounded-lg bg-linear-to-br ${c.accent} flex items-center justify-center font-bold text-slate-900 text-lg`} aria-hidden>
-												{c.title.split(' ').map(w => w[0]).slice(0,2).join('')}
+											<div className={`w-14 h-14 rounded-lg bg-linear-to-br ${c.accent} flex items-center justify-center`} aria-hidden>
+												<Icon className="w-7 h-7 text-slate-900" />
 											</div>
 											<div>
 												<h3 id={`coach-${c.id}-title`} className="text-lg font-semibold">{c.title}</h3>

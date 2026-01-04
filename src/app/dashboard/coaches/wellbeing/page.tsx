@@ -2,6 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
+import { Heart } from 'lucide-react';
 
 export default function WellbeingCoachPage() {
   return (
@@ -10,7 +11,12 @@ export default function WellbeingCoachPage() {
         {/* Hero */}
         <div className="mb-8 grid grid-cols-1 lg:grid-cols-3 gap-6 items-center">
           <div className="lg:col-span-2">
-            <h1 className="text-3xl font-semibold">Well‑being Coach</h1>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-linear-to-br from-sky-400 to-indigo-400 flex items-center justify-center" aria-hidden>
+                <Heart className="w-5 h-5 text-slate-900" />
+              </div>
+              <h1 className="text-3xl font-semibold">Well‑being Coach</h1>
+            </div>
             <p className="text-sm text-slate-300 mt-2 max-w-2xl">
               Practical routines, mindfulness exercises, sleep & nutrition guidance to help you feel your best.
             </p>
