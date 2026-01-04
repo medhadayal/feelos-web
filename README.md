@@ -51,8 +51,14 @@ For public internet launch (production), also set:
 Optional (only if you want DB-backed auth/user records):
 
 - `DATABASE_URL=...`
+- `DIRECT_URL=...` (recommended; can be the same as `DATABASE_URL` locally)
 
 Note: Prisma is configured for PostgreSQL. For Vercel, use a hosted Postgres (Neon/Supabase/etc). SQLite is not recommended for production/serverless.
+
+Local Docker Postgres (from `docker-compose.yml`) example:
+
+- `DATABASE_URL=postgresql://postgres:postgres@localhost:5432/feelos?schema=public`
+- `DIRECT_URL=postgresql://postgres:postgres@localhost:5432/feelos?schema=public`
 
 If you use Supabase + Vercel:
 

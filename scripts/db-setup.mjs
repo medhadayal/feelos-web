@@ -76,7 +76,9 @@ if (dbUrl) {
   // If using SQLite, there's no network to probe — just migrate/seed directly.
   const isSQLite = dbUrl.startsWith('file:') || /sqlite/i.test(dbUrl);
   if (isSQLite) {
-    console.log('SQLite database detected from DATABASE_URL — running migrate/seed without network check.');
+      console.warn('SQLite-style DATABASE_URL detected (file:/sqlite). This project is configured for PostgreSQL in prisma/schema.prisma.');
+      console.warn('Update DATABASE_URL to a PostgreSQL connection string (or run `npm run db:up` for local Docker Postgres).');
+      skipMigrateSeed = true;
   } else {
     try {
       const u = new URL(dbUrl);
