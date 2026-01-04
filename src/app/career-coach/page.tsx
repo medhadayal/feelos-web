@@ -1,6 +1,6 @@
 // app/career-coach/page.tsx
-import AppShell from "@/components/UI/layout/AppShell";
-import StatCard from "@/components/UI/ui/StatCard";
+import AppShell from "@/components/ui/layout/AppShell";
+import StatCard from "@/components/ui/ui/StatCard";
 
 export default function CareerCoachPage() {
   return (
