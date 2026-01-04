@@ -119,9 +119,12 @@ export default function AICompanionPage() {
   const [videoCallOn, setVideoCallOn] = useState(false);
   const [ttsOn, setTtsOn] = useState(true);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [attachment, setAttachment] = useState<{ kind: "text"; name: string; text: string } | { kind: "image"; name: string; dataUrl: string } | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
+  const composerRef = useRef<HTMLDivElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const speech = useSpeechRecognition();
 
@@ -155,7 +158,59 @@ export default function AICompanionPage() {
 
   useEffect(() => {
     chatScrollRef.current?.scrollTo({ top: chatScrollRef.current.scrollHeight, behavior: "smooth" });
+    // On some mobile browsers, viewport height/keyboard changes can hide the composer.
+    // Ensure the composer is brought into view when messages change.
+    composerRef.current?.scrollIntoView({ block: "end", behavior: "smooth" });
   }, [activeId, activeThread?.messages.length]);
+
+  const pickFile = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
+
+  const onFileSelected = useCallback(async (file: File | null) => {
+    if (!file) return;
+    setError(null);
+
+    // Small safety cap for uploads.
+    if (file.size > 4.5 * 1024 * 1024) {
+      setError("File too large (max ~4.5MB). Please upload a smaller file.");
+      return;
+    }
+
+    const lname = file.name.toLowerCase();
+    const isImage = file.type.startsWith("image/") || lname.endsWith(".png") || lname.endsWith(".jpg") || lname.endsWith(".jpeg") || lname.endsWith(".webp");
+
+    if (isImage) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUrl = String(reader.result ?? "");
+        if (!dataUrl.startsWith("data:image/")) {
+          setError("Unsupported image format.");
+          return;
+        }
+        setAttachment({ kind: "image", name: file.name, dataUrl });
+      };
+      reader.onerror = () => setError("Failed to read image.");
+      reader.readAsDataURL(file);
+      return;
+    }
+
+    // For docs/PDF/text, extract text server-side using existing /api/parse-resume.
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const res = await fetch("/api/parse-resume", { method: "POST", body: form });
+      const json = (await res.json().catch(() => ({}))) as { text?: unknown; error?: unknown };
+      if (!res.ok) {
+        setError(String(json?.error ?? "Failed to parse file"));
+        return;
+      }
+      const text = String(json?.text ?? "");
+      setAttachment({ kind: "text", name: file.name, text });
+    } catch {
+      setError("Failed to upload/parse file.");
+    }
+  }, []);
 
   const speak = useCallback(
     (text: string) => {
@@ -178,20 +233,21 @@ export default function AICompanionPage() {
   const sendMessage = useCallback(
     async (forcedText?: string) => {
       const text = (forcedText ?? input).trim();
-      if (!text || sending) return;
+      if ((!text && !attachment) || sending) return;
       setError(null);
       setInput("");
 
       const threadId = activeId ?? threads[0]?.id;
       if (!threadId) return;
 
-      const userMsg: ChatMessage = { id: uid("m_"), role: "user", text };
+      const userText = text || (attachment ? `[Attached: ${attachment.name}]` : "");
+      const userMsg: ChatMessage = { id: uid("m_"), role: "user", text: userText };
       setThreads((prev) =>
         prev.map((t) =>
           t.id === threadId
             ? {
                 ...t,
-                title: t.title === "New chat" ? text.slice(0, 32) : t.title,
+                title: t.title === "New chat" ? userText.slice(0, 32) : t.title,
                 updatedAt: Date.now(),
                 messages: [...t.messages, userMsg],
               }
@@ -202,21 +258,22 @@ export default function AICompanionPage() {
       setSending(true);
       try {
         const baseMessages = (activeThread?.messages ?? []).concat(userMsg);
-        const payloadMessages = [
-          {
-            role: "system",
-            content:
-              "You are FeelOS AI Companion. Be helpful, direct, and safe. Answer the user’s question clearly. If the user asks for something impossible in-app, suggest a workaround.",
-          },
-          ...baseMessages
-            .filter((m) => m.role === "user" || m.role === "assistant")
-            .map((m) => ({ role: m.role, content: m.text })),
-        ];
+        const payloadMessages = baseMessages
+          .filter((m) => m.role === "user" || m.role === "assistant")
+          .map((m) => ({ role: m.role, content: m.text }));
 
-        const res = await fetch("/api/ai/infer", {
+        const attachments = attachment
+          ? [
+              attachment.kind === "image"
+                ? { type: "image" as const, name: attachment.name, dataUrl: attachment.dataUrl }
+                : { type: "text" as const, name: attachment.name, text: attachment.text },
+            ]
+          : [];
+
+        const res = await fetch("/api/companion/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ messages: payloadMessages }),
+          body: JSON.stringify({ messages: payloadMessages, attachments }),
         });
 
         const json = (await res.json().catch(() => ({}))) as { reply?: unknown; error?: unknown };
@@ -232,15 +289,18 @@ export default function AICompanionPage() {
             t.id === threadId ? { ...t, updatedAt: Date.now(), messages: [...t.messages, assistMsg] } : t
           )
         );
+        setAttachment(null);
         if (audioCallOn) speak(reply);
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : String(e);
         setError(msg);
       } finally {
         setSending(false);
+        // keep composer visible after long replies
+        requestAnimationFrame(() => composerRef.current?.scrollIntoView({ block: "end", behavior: "smooth" }));
       }
     },
-    [activeId, activeThread?.messages, audioCallOn, input, sending, speak, threads]
+    [activeId, activeThread?.messages, attachment, audioCallOn, input, sending, speak, threads]
   );
 
   useEffect(() => {
@@ -312,8 +372,8 @@ export default function AICompanionPage() {
   }
 
   return (
-    <div className="min-h-[calc(100vh-2rem)] w-full text-white">
-      <div className="h-[calc(100vh-2rem)] rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl overflow-hidden grid grid-cols-1 md:grid-cols-[280px_1fr]">
+    <div className="min-h-dvh w-full text-white">
+      <div className="h-dvh rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl overflow-hidden grid grid-cols-1 md:grid-cols-[280px_1fr]">
         {/* Sidebar */}
         <aside className="hidden md:flex flex-col border-r border-white/10 bg-black/20">
           <div className="p-3 border-b border-white/10">
@@ -427,7 +487,7 @@ export default function AICompanionPage() {
           </div>
 
           {/* Composer */}
-          <div className="border-t border-white/10 bg-black/20 p-3">
+          <div ref={composerRef} className="border-t border-white/10 bg-black/20 p-3">
             {error && (
               <div className="mb-3 rounded-xl bg-white/5 border border-white/10 p-3 text-sm text-amber-200">
                 {error}
@@ -439,7 +499,58 @@ export default function AICompanionPage() {
             {audioCallOn && (
               <div className="mb-3 text-xs text-slate-300">{speech.listening ? "Listening… speak now" : "Starting audio call…"}</div>
             )}
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0] ?? null;
+                // allow re-selecting same file
+                e.currentTarget.value = "";
+                void onFileSelected(f);
+              }}
+            />
+
+            {attachment && (
+              <div className="mb-3 rounded-xl bg-white/5 border border-white/10 px-3 py-2 text-xs text-slate-200 flex items-center justify-between gap-2">
+                <div className="truncate">Attached: <span className="font-medium">{attachment.name}</span></div>
+                <button onClick={() => setAttachment(null)} className="px-2 py-1 rounded-md bg-white/6 hover:bg-white/10">Remove</button>
+              </div>
+            )}
+
             <div className="flex items-end gap-3">
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={pickFile}
+                  className="px-3 py-2 rounded-xl text-xs bg-white/6 hover:bg-white/10 border border-white/10"
+                  title="Attach a file or image"
+                  type="button"
+                >
+                  Attach
+                </button>
+                <button
+                  onClick={() => {
+                    if (!speech.supported) {
+                      setError("Voice input requires Chrome/Edge (Speech Recognition). ");
+                      return;
+                    }
+                    // one-shot voice: capture a single utterance then stop
+                    speech.start(
+                      (t) => {
+                        setInput(t);
+                        speech.stop();
+                        setTimeout(() => void sendMessage(t), 0);
+                      },
+                      (msg) => setError(msg)
+                    );
+                  }}
+                  className="px-3 py-2 rounded-xl text-xs bg-white/6 hover:bg-white/10 border border-white/10"
+                  title="Speak a question"
+                  type="button"
+                >
+                  Mic
+                </button>
+              </div>
               <textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
@@ -455,8 +566,8 @@ export default function AICompanionPage() {
               />
               <button
                 onClick={() => void sendMessage()}
-                disabled={!input.trim() || sending}
-                className={`px-4 py-3 rounded-xl text-sm font-semibold ${input.trim() && !sending ? "bg-linear-to-r from-pink-500 to-yellow-300 text-slate-900" : "bg-white/6 text-slate-400 cursor-not-allowed"}`}
+                disabled={(!input.trim() && !attachment) || sending}
+                className={`px-4 py-3 rounded-xl text-sm font-semibold ${(input.trim() || attachment) && !sending ? "bg-linear-to-r from-pink-500 to-yellow-300 text-slate-900" : "bg-white/6 text-slate-400 cursor-not-allowed"}`}
               >
                 Send
               </button>

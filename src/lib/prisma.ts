@@ -24,7 +24,14 @@ type PrismaLike = {
     create: (args: { data: { id?: string; email?: string | null; name: string | null } }) => Promise<User>;
     findUnique: (args: { where: { id?: string; email?: string } }) => Promise<User | null>;
   };
-  conversationMessage: { create: (args: { data: { userId: string; role: string; content: string } }) => Promise<ConversationMessage> };
+  conversationMessage: {
+    create: (args: { data: { userId: string; role: string; content: string } }) => Promise<ConversationMessage>;
+    findMany: (args: {
+      where?: { userId?: string };
+      orderBy?: { createdAt?: "desc" | "asc" };
+      take?: number;
+    }) => Promise<ConversationMessage[]>;
+  };
   moodEntry: { create: (args: { data: { userId: string; mood: string; note: string | null } }) => Promise<MoodEntry> };
   jobApplication: {
     create: (args: { data: Omit<JobApplication, "id" | "createdAt" | "updatedAt"> }) => Promise<JobApplication>;
@@ -85,6 +92,25 @@ function makeMockPrisma() {
         const row = { id: Math.random().toString(36).slice(2), ...data, createdAt: now() };
         messages.push(row);
         return mockDelay(row as unknown as ConversationMessage);
+      },
+      findMany: async ({ where, orderBy, take }) => {
+        let list = messages;
+        if (where?.userId) list = list.filter((m) => (m as AnyObj).userId === where.userId);
+        if (orderBy?.createdAt === "desc") {
+          list = list.sort((a, b) => {
+            const au = String((a as AnyObj).createdAt ?? "");
+            const bu = String((b as AnyObj).createdAt ?? "");
+            return au < bu ? 1 : -1;
+          });
+        } else if (orderBy?.createdAt === "asc") {
+          list = list.sort((a, b) => {
+            const au = String((a as AnyObj).createdAt ?? "");
+            const bu = String((b as AnyObj).createdAt ?? "");
+            return au > bu ? 1 : -1;
+          });
+        }
+        if (typeof take === "number") list = list.slice(0, take);
+        return mockDelay(list as unknown as ConversationMessage[]);
       },
     },
     moodEntry: {

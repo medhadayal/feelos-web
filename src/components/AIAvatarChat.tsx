@@ -1,5 +1,5 @@
 'use client';
-// Replace mock client with streaming consumption of /api/companion/chat (SSE-like)
+// Simple JSON chat client for /api/companion/chat
 import React, { useEffect, useRef, useState } from "react";
 
 type Msg = { role: "user" | "assistant"; content: string };
@@ -19,61 +19,22 @@ export default function AIAvatarChat() {
     setInput("");
     setSending(true);
 
-    // POST to server - server streams back SSE-like data
+    // POST to server (JSON)
     const res = await fetch("/api/companion/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ userId: "user_1", messages: [...messages, user].map(m => ({ role: m.role, content: m.content })) }),
     });
 
-    if (!res.ok || !res.body) {
+    if (!res.ok) {
       const err = await res.json().catch(() => ({ error: "Network" }));
       setMessages((s) => [...s, { role: "assistant", content: `[Error] ${err?.error || "unknown"}` }]);
       setSending(false);
       return;
     }
-
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-    let assistantIndex = -1;
-    // create blank assistant message
-    setMessages((s) => { assistantIndex = s.length; return [...s, { role: "assistant", content: "" }]; });
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      // parse SSE chunks like "data: {...}\n\n"
-      const parts = buffer.split("\n\n");
-      buffer = parts.pop() || "";
-      for (const part of parts) {
-        const line = part.trim();
-        if (!line) continue;
-        if (line.startsWith("data:")) {
-          const payload = line.replace(/^data:\s*/, "");
-          try {
-            const obj = JSON.parse(payload);
-            const chunk = obj.chunk ?? "";
-            setMessages((prev) => {
-              const copy = [...prev];
-              if (assistantIndex >= 0 && assistantIndex < copy.length) {
-                copy[assistantIndex] = { ...copy[assistantIndex], content: copy[assistantIndex].content + chunk };
-              } else {
-                copy.push({ role: "assistant", content: chunk });
-                assistantIndex = copy.length - 1;
-              }
-              return copy;
-            });
-          } catch {
-            // ignore parse errors
-          }
-        } else if (line.startsWith("event: done")) {
-          // end event
-        }
-      }
-    }
-
+    const json = await res.json().catch(() => ({} as any));
+    const reply = String(json?.reply ?? "").trim() || "(No reply)";
+    setMessages((s) => [...s, { role: "assistant", content: reply }]);
     setSending(false);
   }
 

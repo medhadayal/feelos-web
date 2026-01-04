@@ -17,6 +17,26 @@ export default function CompanionPage() {
   const todayFocus: string[] = ["Plan morning routine", "Deep work: product spec", "1:1 with manager"];
   const [selfCare, setSelfCare] = useState<string>("Take a 10‑minute mindful walk");
   const messagesRef = useRef<HTMLDivElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [attachment, setAttachment] = useState<{ kind: "text"; name: string; text: string } | { kind: "image"; name: string; dataUrl: string } | null>(null);
+
+  const speechRef = useRef<any>(null);
+  const [listening, setListening] = useState(false);
+
+  useEffect(() => {
+    const w = window as any;
+    const Ctor = w.SpeechRecognition || w.webkitSpeechRecognition;
+    if (!Ctor) return;
+    const r = new Ctor();
+    r.continuous = false;
+    r.interimResults = false;
+    r.lang = "en-US";
+    speechRef.current = r;
+    return () => {
+      try { r.stop(); } catch {}
+      speechRef.current = null;
+    };
+  }, []);
 
   useEffect(() => {
     messagesRef.current?.scrollTo({ top: messagesRef.current.scrollHeight, behavior: "smooth" });
@@ -30,10 +50,11 @@ export default function CompanionPage() {
 
   async function sendMessage(userText?: string) {
     const text = (userText ?? input).trim();
-    if (!text) return;
+    if (!text && !attachment) return;
     setInput("");
     setSending(true);
-    addMessage("user", text);
+    const userVisible = text || (attachment ? `[Attached: ${attachment.name}]` : "");
+    addMessage("user", userVisible);
 
     // POST to API (mock). The API returns { reply, suggestedActions }.
     try {
@@ -42,8 +63,17 @@ export default function CompanionPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userId: mockUser.id,
-          messages: messages.concat({ id: "tmp", role: "user", content: text, timestamp: new Date().toISOString() }).map(m => ({ role: m.role, content: m.content })),
+          messages: messages
+            .concat({ id: "tmp", role: "user", content: userVisible, timestamp: new Date().toISOString() })
+            .map(m => ({ role: m.role, content: m.content })),
           moodSnapshot: { mood },
+          attachments: attachment
+            ? [
+                attachment.kind === "image"
+                  ? { type: "image" as const, name: attachment.name, dataUrl: attachment.dataUrl }
+                  : { type: "text" as const, name: attachment.name, text: attachment.text },
+              ]
+            : [],
         }),
       });
       const json = await res.json();
@@ -80,6 +110,7 @@ export default function CompanionPage() {
           setTimeout(streamStep, 120);
         } else {
           setSending(false);
+          setAttachment(null);
           // suggested actions could be displayed; for now mock update
           if (json?.suggestedActions?.length) {
             // optionally show quick suggestions (not implemented visually here)
@@ -91,6 +122,68 @@ export default function CompanionPage() {
     } catch {
       addMessage("assistant", "Network error — please try again.");
       setSending(false);
+    }
+  }
+
+  async function onFileSelected(file: File | null) {
+    if (!file) return;
+    if (file.size > 4.5 * 1024 * 1024) {
+      addMessage("assistant", "File too large (max ~4.5MB). Please upload a smaller file.");
+      return;
+    }
+
+    const lname = file.name.toLowerCase();
+    const isImage = file.type.startsWith("image/") || lname.endsWith(".png") || lname.endsWith(".jpg") || lname.endsWith(".jpeg") || lname.endsWith(".webp");
+
+    if (isImage) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUrl = String(reader.result ?? "");
+        setAttachment({ kind: "image", name: file.name, dataUrl });
+      };
+      reader.onerror = () => addMessage("assistant", "Failed to read image.");
+      reader.readAsDataURL(file);
+      return;
+    }
+
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const res = await fetch("/api/parse-resume", { method: "POST", body: form });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        addMessage("assistant", `Failed to parse file: ${String(json?.error ?? "unknown")}`);
+        return;
+      }
+      setAttachment({ kind: "text", name: file.name, text: String(json?.text ?? "") });
+    } catch {
+      addMessage("assistant", "Failed to upload/parse file.");
+    }
+  }
+
+  function startVoice() {
+    const r = speechRef.current;
+    if (!r) {
+      addMessage("assistant", "Voice input requires Chrome/Edge (Speech Recognition).");
+      return;
+    }
+    try {
+      setListening(true);
+      r.onresult = (ev: any) => {
+        const t = String(ev?.results?.[0]?.[0]?.transcript ?? "").trim();
+        if (t) {
+          setInput(t);
+          setTimeout(() => void sendMessage(t), 0);
+        }
+      };
+      r.onerror = () => {
+        setListening(false);
+        addMessage("assistant", "Voice input error.");
+      };
+      r.onend = () => setListening(false);
+      r.start();
+    } catch {
+      setListening(false);
     }
   }
 
@@ -145,6 +238,24 @@ export default function CompanionPage() {
             </div>
 
             <div className="mt-3">
+              <input
+                ref={fileInputRef}
+                type="file"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0] ?? null;
+                  e.currentTarget.value = "";
+                  void onFileSelected(f);
+                }}
+              />
+
+              {attachment && (
+                <div className="mb-2 rounded bg-white/5 border border-white/10 p-2 text-xs text-slate-200 flex items-center justify-between gap-2">
+                  <div className="truncate">Attached: <span className="font-medium">{attachment.name}</span></div>
+                  <button onClick={() => setAttachment(null)} className="px-2 py-1 rounded bg-white/6">Remove</button>
+                </div>
+              )}
+
               <textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
@@ -163,6 +274,8 @@ export default function CompanionPage() {
 
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-slate-400 mr-2">Mood: <strong className="ml-1">{mood}</strong></span>
+                  <button onClick={() => fileInputRef.current?.click()} className="px-3 py-2 rounded bg-white/6 text-sm">Attach</button>
+                  <button onClick={startVoice} className="px-3 py-2 rounded bg-white/6 text-sm">{listening ? "Listening…" : "Mic"}</button>
                   <button onClick={() => logMood("happy", "Quick check")} className="px-4 py-2 rounded bg-linear-to-r from-green-400 to-teal-400 text-slate-900 text-sm">Log Happy</button>
                   <button onClick={() => sendMessage()} disabled={sending} className="px-4 py-2 rounded bg-linear-to-r from-pink-500 to-yellow-300 text-slate-900 text-sm">
                     {sending ? "Sending…" : "Send"}
