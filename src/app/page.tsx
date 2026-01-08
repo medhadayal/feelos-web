@@ -30,7 +30,7 @@ export default function LoginPage() {
 			{/* gradient shapes only */}
 			<div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
 				<div className="absolute -left-32 -top-24 w-80 h-80 rounded-full bg-pink-600/20 blur-3xl" />
-				<div className="absolute right-[-6rem] top-24 w-96 h-96 rounded-full bg-indigo-600/16 blur-3xl" />
+				<div className="absolute -right-24 top-24 w-96 h-96 rounded-full bg-indigo-600/16 blur-3xl" />
 			</div>
 
 			{/* Centered login card */}
@@ -52,7 +52,7 @@ export default function LoginPage() {
 								name="email"
 								required
 								placeholder="you@company.com"
-								className="mt-1 w-full rounded-xl bg-white/5 px-3 py-2 text-sm outline-none border border-white/10 focus:border-pink-400 focus:ring-2 focus:ring-[var(--ring)]"
+								className="mt-1 w-full rounded-xl bg-white/5 px-3 py-2 text-sm outline-none border border-white/10 focus:border-pink-400 focus:ring-2 focus:ring-ring"
 							/>
 						</div>
 
@@ -62,7 +62,7 @@ export default function LoginPage() {
 								type="password"
 								name="password"
 								required
-								className="mt-1 w-full rounded-xl bg-white/5 px-3 py-2 text-sm outline-none border border-white/10 focus:border-pink-400 focus:ring-2 focus:ring-[var(--ring)]"
+								className="mt-1 w-full rounded-xl bg-white/5 px-3 py-2 text-sm outline-none border border-white/10 focus:border-pink-400 focus:ring-2 focus:ring-ring"
 							/>
 						</div>
 

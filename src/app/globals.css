@@ -43,65 +43,10 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 
-/* FeelOS dark theme – base values */
+/* FeelOS dark theme (single theme) */
 :root {
   --radius: 0.75rem;
 
-  /* Background + text */
-  --background: #020617; /* very dark blue/black */
-  --foreground: #f9fafb; /* almost white */
-
-  /* Cards / surfaces (glassy navy) */
-  --card: rgba(15, 23, 42, 0.94); /* slate-900-ish */
-  --card-foreground: #e5e7eb;
-
-  --popover: rgba(15, 23, 42, 0.98);
-  --popover-foreground: #f9fafb;
-
-  /* Primary accent (pink–orange FeelOS button color) */
-  --primary: #ff4b91;
-  --primary-foreground: #ffffff;
-
-  /* Secondary surface */
-  --secondary: rgba(15, 23, 42, 0.8);
-  --secondary-foreground: #e5e7eb;
-
-  /* Muted / subtle */
-  --muted: rgba(15, 23, 42, 0.7);
-  --muted-foreground: #94a3b8;
-
-  /* Accent pills / chips */
-  --accent: rgba(56, 189, 248, 0.12); /* cyan glow */
-  --accent-foreground: #e0f2fe;
-
-  /* Destructive */
-  --destructive: #f97373;
-
-  /* Borders / inputs / focus ring */
-  --border: rgba(148, 163, 184, 0.35);
-  --input: rgba(15, 23, 42, 0.9);
-  --ring: #38bdf8; /* cyan focus */
-
-  /* Chart colors (for future dashboards) */
-  --chart-1: #38bdf8; /* cyan */
-  --chart-2: #a855f7; /* purple */
-  --chart-3: #f97316; /* orange */
-  --chart-4: #22c55e; /* green */
-  --chart-5: #ec4899; /* pink */
-
-  /* Sidebar specifically (just slightly different to stand out if used) */
-  --sidebar: rgba(15, 23, 42, 0.96);
-  --sidebar-foreground: #f9fafb;
-  --sidebar-primary: #ff4b91;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: rgba(56, 189, 248, 0.12);
-  --sidebar-accent-foreground: #e0f2fe;
-  --sidebar-border: rgba(148, 163, 184, 0.3);
-  --sidebar-ring: #38bdf8;
-}
-
-/* If you ever add .dark class, keep it the same look */
-.dark {
   --background: #020617;
   --foreground: #f9fafb;
 
@@ -143,6 +88,10 @@
   --sidebar-accent-foreground: #e0f2fe;
   --sidebar-border: rgba(148, 163, 184, 0.3);
   --sidebar-ring: #38bdf8;
+
+  --bg-grad-a: #1f2937;
+  --bg-grad-b: #4c1d95;
+  --bg-solid: #020617;
 }
 
 @layer base {
@@ -155,9 +104,9 @@
     background-color: var(--background);
     /* FeelOS-style radial + linear gradient background */
     background-image:
-      radial-gradient(circle at top left, #1f2937 0, transparent 55%),
-      radial-gradient(circle at bottom right, #4c1d95 0, transparent 55%),
-      linear-gradient(to bottom right, #020617, #020617);
+      radial-gradient(circle at top left, var(--bg-grad-a) 0, transparent 55%),
+      radial-gradient(circle at bottom right, var(--bg-grad-b) 0, transparent 55%),
+      linear-gradient(to bottom right, var(--bg-solid), var(--bg-solid));
     background-attachment: fixed;
   }
 }
@@ -165,24 +114,24 @@
 @layer components {
   /* Glassy card used across dashboard */
   .card {
-    @apply rounded-2xl bg-black/40 border border-white/6 backdrop-blur-lg p-6 shadow-xl transition-all duration-200 ease-in-out;
+    @apply rounded-2xl bg-card/70 text-card-foreground border border-border backdrop-blur-lg p-6 shadow-xl transition-all duration-200 ease-in-out;
     min-height: 10rem;
   }
 
   /* Hero-specific card (large analytics area) */
   .hero-card {
-    @apply rounded-2xl bg-black/40 border border-white/6 backdrop-blur-lg p-6 shadow-xl transition-all duration-200 ease-in-out;
+    @apply rounded-2xl bg-card/70 text-card-foreground border border-border backdrop-blur-lg p-6 shadow-xl transition-all duration-200 ease-in-out;
     min-height: 18rem;
   }
 
   /* KPI tile */
   .kpi {
-    @apply flex flex-col items-start justify-center p-5 rounded-xl bg-gradient-to-br from-white/3 to-white/2 border border-white/6;
+    @apply flex flex-col items-start justify-center p-5 rounded-xl bg-linear-to-br from-card/70 to-card/50 border border-border;
   }
 
   /* Chart placeholder (responsive) */
   .chart-placeholder {
-    @apply w-full h-40 sm:h-48 md:h-56 rounded-xl bg-linear-to-r from-slate-800 to-slate-900 flex items-center justify-center text-slate-400;
+    @apply w-full h-40 sm:h-48 md:h-56 rounded-xl bg-muted flex items-center justify-center text-muted-foreground;
   }
 
   /* Responsive grid for dashboard cards */
@@ -192,7 +141,7 @@
 
   /* Table responsive wrapper */
   .table-responsive {
-    @apply overflow-x-auto rounded-xl bg-black/30 p-4;
+    @apply overflow-x-auto rounded-xl bg-card/60 border border-border p-4;
   }
 
   /* Subtle FAANG-like accent */
@@ -203,7 +152,7 @@
   /* Loading overlay (centered logo + spinner) */
   .loading-screen {
     @apply fixed inset-0 z-50 flex items-center justify-center;
-    background: linear-gradient(180deg, rgba(2,6,23,0.9), rgba(2,6,23,0.9));
+    background: linear-gradient(180deg, color-mix(in oklab, var(--background) 92%, transparent), color-mix(in oklab, var(--background) 92%, transparent));
   }
 
   .loading-inner {

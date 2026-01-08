@@ -98,7 +98,15 @@ Respond only with the JSON described above.
 
     if (!openAiRes.ok) {
       const text = await openAiRes.text();
-      return NextResponse.json({ error: "OpenAI error", details: text }, { status: openAiRes.status });
+      let userMessage = "Failed to optimize resume";
+      try {
+        const errorData = JSON.parse(text);
+        if (errorData?.error?.message?.includes("invalid_request_error")) userMessage = "Invalid request to AI service. Please check your inputs.";
+        if (errorData?.error?.message?.includes("rate_limit")) userMessage = "Too many requests. Please wait a moment and try again.";
+        if (errorData?.error?.message?.includes("server_error")) userMessage = "AI service temporarily unavailable. Please try again in a moment.";
+        if (openAiRes.status === 401) userMessage = "AI service authentication failed (server configuration issue).";
+      } catch {}
+      return NextResponse.json({ error: userMessage, details: text }, { status: openAiRes.status });
     }
 
     const data = await openAiRes.json();

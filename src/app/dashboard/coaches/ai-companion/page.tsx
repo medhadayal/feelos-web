@@ -372,10 +372,10 @@ export default function AICompanionPage() {
   }
 
   return (
-    <div className="min-h-dvh w-full text-white">
-      <div className="h-dvh rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl overflow-hidden grid grid-cols-1 md:grid-cols-[280px_1fr]">
+    <div className="h-[calc(100dvh-5rem)] w-full text-white">
+      <div className="h-full min-h-0 rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl overflow-hidden grid grid-cols-1 md:grid-cols-[280px_1fr]">
         {/* Sidebar */}
-        <aside className="hidden md:flex flex-col border-r border-white/10 bg-black/20">
+        <aside className="hidden md:flex flex-col min-h-0 border-r border-white/10 bg-black/20">
           <div className="p-3 border-b border-white/10">
             <button
               onClick={newChat}
@@ -402,7 +402,7 @@ export default function AICompanionPage() {
         </aside>
 
         {/* Main */}
-        <main className="flex flex-col">
+        <main className="flex flex-col min-h-0">
           {/* Top bar */}
           <div className="flex items-center justify-between gap-3 p-3 border-b border-white/10 bg-black/10">
             <div className="min-w-0">
@@ -462,7 +462,7 @@ export default function AICompanionPage() {
           )}
 
           {/* Messages */}
-          <div ref={chatScrollRef} className="flex-1 overflow-auto p-4 space-y-4 bg-[linear-gradient(180deg,#050816,#0b1221,#020617)]">
+          <div ref={chatScrollRef} className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 space-y-4 bg-[linear-gradient(180deg,#050816,#0b1221,#020617)]">
             {(activeThread?.messages ?? []).map((m) => (
               <div key={m.id} className={m.role === "user" ? "flex justify-end" : "flex justify-start"}>
                 <div

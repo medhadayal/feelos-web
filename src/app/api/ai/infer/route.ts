@@ -104,8 +104,15 @@ export async function POST(req: Request) {
         });
         if (!r.ok) {
           const txt = await r.text().catch(() => "openai error");
+          let userMessage = "AI service error";
+          try {
+            JSON.parse(txt);
+            if (r.status === 401) userMessage = "AI service authentication failed.";
+            if (r.status === 429) userMessage = "Too many requests. Please wait a moment.";
+            if (r.status === 500 || r.status === 503) userMessage = "AI service temporarily unavailable.";
+          } catch {}
           return NextResponse.json(
-            { error: "openai error", details: cap(txt), upstreamStatus: r.status },
+            { error: userMessage, details: cap(txt), upstreamStatus: r.status },
             { status: 502 }
           );
         }

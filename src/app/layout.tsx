@@ -31,7 +31,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" className="dark" suppressHydrationWarning>
       <head>
         <link rel="icon" href="/favicon.ico" sizes="any" />
         <link rel="icon" href="/favicon.png" type="image/png" />
@@ -40,17 +40,30 @@ export default function RootLayout({
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
         {/* persistent header showing logo on all pages */}
         <header className="fixed top-4 left-1/2 transform -translate-x-1/2 z-40 w-full max-w-7xl px-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-3">
             <Link href="/" aria-label="FeelOS home" className="flex items-center gap-3">
-              <Image src="/logo.png" alt="FeelOS" width={40} height={40} className="rounded-md object-contain" priority />
+              <Image
+                src="/logo.png"
+                alt="FeelOS"
+                width={40}
+                height={40}
+                className="rounded-md object-contain"
+                priority
+              />
               <span className="hidden sm:inline-block font-semibold">FeelOS</span>
             </Link>
 
-            {/* simple nav/actions placeholder */}
-            <nav className="hidden md:flex items-center gap-3">
-              <Link href="/dashboard" className="text-sm px-3 py-2 rounded-md hover:bg-white/3">Dashboard</Link>
-              <a href="#" className="text-sm px-3 py-2 rounded-md hover:bg-white/3">Coaches</a>
-            </nav>
+            {/* simple nav/actions */}
+            <div className="flex items-center gap-2">
+              <nav className="hidden md:flex items-center gap-2">
+                <Link
+                  href="/dashboard"
+                  className="text-sm px-3 py-2 rounded-md hover:bg-accent hover:text-accent-foreground"
+                >
+                  Dashboard
+                </Link>
+              </nav>
+            </div>
           </div>
         </header>
 

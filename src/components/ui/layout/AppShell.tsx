@@ -75,10 +75,10 @@ export default function AppShell({ children }: AppShellProps) {
             aria-expanded={!collapsed}
             aria-pressed={collapsed}
             onClick={() => setCollapsed((s) => !s)}
-            className="p-2 rounded hover:bg-white/6 focus-ring transition-all duration-150"
+            className="p-2 rounded hover:bg-accent focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] transition-all duration-150"
           >
             <svg
-              className="w-4 h-4 text-slate-200"
+              className="w-4 h-4 text-foreground/80"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -154,7 +154,7 @@ export default function AppShell({ children }: AppShellProps) {
           )}
           <button
             aria-label="Settings"
-            className="p-1 rounded hover:bg-white/6"
+            className="p-1 rounded hover:bg-accent"
           >
             <svg
               className="w-4 h-4"
@@ -190,7 +190,7 @@ export default function AppShell({ children }: AppShellProps) {
               <label className="sr-only">Search</label>
               <input
                 placeholder="Search coaches, projects, actions..."
-                className="w-full rounded-xl bg-white/5 px-3 py-2 text-sm outline-none border border-white/8 focus:ring-2 focus:ring-[var(--ring)] focus:ring-opacity-60 transition-all duration-150"
+                className="w-full rounded-xl bg-input/60 px-3 py-2 text-sm outline-none border border-border focus-visible:ring-2 focus-visible:ring-ring/60 transition-all duration-150"
               />
             </div>
           </div>
@@ -198,7 +198,7 @@ export default function AppShell({ children }: AppShellProps) {
           {/* Right side – avatar / actions */}
           <div className="flex items-center gap-3">
             <button
-              className="p-2 rounded-md hover:bg-white/6"
+              className="p-2 rounded-md hover:bg-accent"
               aria-label="Notifications"
             >
               <svg
@@ -215,7 +215,7 @@ export default function AppShell({ children }: AppShellProps) {
             </button>
 
             <button
-              className="hidden sm:inline-flex items-center gap-2 rounded-full px-3 py-1.5 bg-white/6"
+              className="hidden sm:inline-flex items-center gap-2 rounded-full px-3 py-1.5 bg-muted"
               aria-label="Profile"
             >
               {/* header/profile avatar — replaced with inline cartoon SVG */}
